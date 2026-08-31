@@ -17,7 +17,8 @@ out/
 # picking up an AWS key, so the patterns are deliberately wide.
 keys
 keys.*
-*keys.rtf
+*keys*
+*.rtf
 .env
 .env.*
 *.pem
