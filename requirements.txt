@@ -7,3 +7,6 @@ uvicorn==0.52.4
 
 # Tests. They run against the live NIH and FDA APIs on purpose — see tests/.
 pytest==9.1.1
+
+# Lambda adapter — the deployed app is the same FastAPI app, not a rewrite.
+mangum==0.22.0
