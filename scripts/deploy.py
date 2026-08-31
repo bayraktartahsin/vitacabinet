@@ -153,36 +153,60 @@ def _wait(lam) -> None:
         time.sleep(2)
 
 
-def ensure_url(lam) -> str:
-    try:
-        url = lam.get_function_url_config(FunctionName=FUNCTION)["FunctionUrl"]
-    except ClientError as e:
-        if e.response["Error"]["Code"] != "ResourceNotFoundException":
-            raise
-        say("creating the public URL…")
-        url = lam.create_function_url_config(
-            FunctionName=FUNCTION, AuthType="NONE",
-            Cors={"AllowOrigins": ["*"], "AllowMethods": ["*"], "AllowHeaders": ["*"]},
-        )["FunctionUrl"]
+def ensure_url(lam, account: str) -> str:
+    """A public front door, via API Gateway rather than a Lambda Function URL.
 
-    # Public means public: without this the URL answers 403 to everyone.
+    The Function URL was the obvious choice and it does not work here. Created
+    with AuthType NONE and the exact resource policy AWS documents — Principal
+    "*", lambda:InvokeFunctionUrl, the FunctionUrlAuthType condition — it still
+    answers 403 AccessDeniedException to anonymous callers. The console shows
+    the policy without complaint, the account is in no organization so no SCP
+    is in play, direct lambda:Invoke of the same function returns 200, and
+    deleting and recreating the URL config changes nothing. The block is above
+    the policy layer and not visible from here.
+
+    An HTTP API is public by default and needs no resource policy for anonymous
+    callers, so it sidesteps the whole question. It is also the more ordinary
+    way to put a web application in front of a Lambda.
+    """
+    api = boto3.client("apigatewayv2", region_name=REGION)
+
+    existing = [a for a in api.get_apis(MaxResults="500")["Items"]
+                if a["Name"] == FUNCTION]
+    if existing:
+        api_id = existing[0]["ApiId"]
+        say(f"api exists: {api_id}")
+    else:
+        say("creating the HTTP API…")
+        api_id = api.create_api(
+            Name=FUNCTION, ProtocolType="HTTP",
+            Target=f"arn:aws:lambda:{REGION}:{account}:function:{FUNCTION}",
+            CorsConfiguration={"AllowOrigins": ["*"], "AllowMethods": ["*"],
+                               "AllowHeaders": ["*"]},
+        )["ApiId"]
+
+    # The quick-create Target above wires $default -> the function. API Gateway
+    # invokes it as a service principal, so this is the permission that matters.
     try:
-        lam.add_permission(FunctionName=FUNCTION, StatementId="public-url",
-                           Action="lambda:InvokeFunctionUrl", Principal="*",
-                           FunctionUrlAuthType="NONE")
+        lam.add_permission(
+            FunctionName=FUNCTION, StatementId="apigateway-invoke",
+            Action="lambda:InvokeFunction", Principal="apigateway.amazonaws.com",
+            SourceArn=f"arn:aws:execute-api:{REGION}:{account}:{api_id}/*/*")
     except ClientError as e:
         if e.response["Error"]["Code"] != "ResourceConflictException":
             raise
-    return url
+
+    return f"https://{api_id}.execute-api.{REGION}.amazonaws.com"
 
 
 def main() -> None:
     print("\nVitaCabinet → AWS Lambda\n")
     code = build_zip()
+    account = boto3.client("sts").get_caller_identity()["Account"]
     role_arn = ensure_role(boto3.client("iam"))
     lam = boto3.client("lambda", region_name=REGION)
     ensure_function(lam, role_arn, code)
-    url = ensure_url(lam)
+    url = ensure_url(lam, account)
     shutil.rmtree(BUILD, ignore_errors=True)
     print(f"\n  live at  {url}\n")
 

@@ -4,6 +4,8 @@
 live recalls, and the drugs nobody has confirmed in months — then keeps watching,
 in the background, for years.**
 
+**Live: https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com**
+
 Built for the AWS *Agents for Humans* hackathon with the
 [Strands Agents SDK](https://strandsagents.com) on Amazon Bedrock.
 
