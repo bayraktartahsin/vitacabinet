@@ -1,0 +1,184 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VitaCabinet</title>
+<style>
+  :root {
+    --ink: #12232e; --muted: #5a6b78; --line: #dbe3e9; --paper: #fbfcfd;
+    --card: #ffffff; --accent: #3d7ea6; --high: #c0504d; --high-bg: #fdecec;
+    --med: #c98b3a; --med-bg: #fdf3e7; --low: #5f8a63; --low-bg: #eef3ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header { padding: 34px 32px 22px; border-bottom: 1px solid var(--line); background: var(--card); }
+  h1 { margin: 0; font-size: 30px; letter-spacing: -0.02em; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 62ch; }
+  main { display: grid; grid-template-columns: 380px 1fr; gap: 28px; padding: 28px 32px 60px; align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .panel .hint { margin: 0 0 14px; font-size: 13.5px; color: var(--muted); }
+
+  textarea {
+    width: 100%; min-height: 210px; padding: 12px; border: 1px solid var(--line);
+    border-radius: 8px; font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--ink); resize: vertical; background: #fff;
+  }
+  button {
+    margin-top: 12px; width: 100%; padding: 12px 16px; border: 0; border-radius: 8px;
+    background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .55; cursor: default; }
+  button.ghost {
+    width: auto; margin: 10px 0 0; padding: 7px 12px; font-size: 13px; font-weight: 500;
+    background: transparent; color: var(--accent); border: 1px solid var(--line);
+  }
+
+  .counts { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+  .count { border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--muted); background: var(--card); }
+  .count b { color: var(--ink); }
+
+  .finding { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; background: var(--card); }
+  .finding.high { border-left-color: var(--high); background: var(--high-bg); }
+  .finding.medium { border-left-color: var(--med); background: var(--med-bg); }
+  .finding.low { border-left-color: var(--low); background: var(--low-bg); }
+  .finding h3 { margin: 0 0 6px; font-size: 17px; }
+  .finding p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .tag { display: inline-block; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .lots { margin-top: 8px; font: 13px ui-monospace, Menlo, monospace; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; display: inline-block; }
+  .question { margin-top: 12px; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; }
+  .question .who { display: block; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+
+  .empty { color: var(--muted); padding: 26px 0; }
+  .note { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; max-width: 68ch; }
+  .unreadable { font: 13.5px ui-monospace, Menlo, monospace; color: var(--muted); }
+</style>
+
+<header>
+  <h1>VitaCabinet</h1>
+  <p>Type what is printed on each box, one per line. VitaCabinet resolves each
+     one against RxNorm, finds the boxes that are the same medicine under two
+     names, and checks the FDA record for live recalls. It does not tell you
+     what to take.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>The drawer</h2>
+    <p class="hint">One box per line, exactly as printed.</p>
+    <textarea id="boxes" spellcheck="false">Glucophage 500mg
+Metformin 500 mg
+Atorvastatin 20mg
+Ramipril 5mg
+Norvasc 5mg
+Aspirin 75mg
+shopping list milk</textarea>
+    <button id="go">Read the drawer</button>
+    <button class="ghost" id="demo">Reset to the demo drawer</button>
+  </section>
+
+  <section>
+    <div class="counts" id="counts"></div>
+    <div id="out"><p class="empty">Nothing read yet.</p></div>
+    <p class="note" id="note"></p>
+  </section>
+</main>
+
+<script>
+const DEMO = `Glucophage 500mg
+Metformin 500 mg
+Atorvastatin 20mg
+Ramipril 5mg
+Norvasc 5mg
+Aspirin 75mg
+shopping list milk`;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+$('demo').onclick = () => { $('boxes').value = DEMO; };
+
+$('go').onclick = async () => {
+  const lines = $('boxes').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) return;
+
+  $('go').disabled = true;
+  $('go').textContent = 'Reading ' + lines.length + ' boxes…';
+  $('out').innerHTML = '<p class="empty">Asking RxNorm and the FDA…</p>';
+  $('counts').innerHTML = '';
+  $('note').textContent = '';
+
+  try {
+    const r = await fetch('/scan', {
+      method: 'POST', headers: {'content-type': 'application/json'},
+      body: JSON.stringify({ boxes: lines.map(t => ({ text: t })) })
+    });
+    render(await r.json());
+  } catch (e) {
+    $('out').innerHTML = '<p class="empty">Could not reach the service: ' + esc(e.message) + '</p>';
+  } finally {
+    $('go').disabled = false;
+    $('go').textContent = 'Read the drawer';
+  }
+};
+
+function render(data) {
+  const s = data.summary;
+  $('counts').innerHTML = [
+    ['boxes read', s.medicines],
+    ['duplicates', data.findings.filter(f => f.kind === 'duplicate').length],
+    ['live recalls', data.findings.filter(f => f.kind === 'recall').length],
+    ['ingredients checked', data.ingredients_checked.length],
+    ['unreadable', data.unreadable.length],
+  ].map(([k, v]) => `<span class="count"><b>${v}</b> ${k}</span>`).join('');
+
+  if (!data.findings.length) {
+    $('out').innerHTML = '<p class="empty">Nothing in this drawer is worth a question today.</p>';
+  } else {
+    $('out').innerHTML = data.findings.map((f, i) => `
+      <article class="finding ${esc(f.severity)}">
+        <span class="tag">${esc(f.kind)}</span>
+        <h3>${esc(f.headline)}</h3>
+        <p>${esc(f.detail)}</p>
+        ${f.lots ? `<div class="lots">Check the box for: ${esc(f.lots)}</div>` : ''}
+        <button class="ghost" data-i="${i}">Write the question to ask</button>
+        <div class="question" id="q${i}" hidden></div>
+      </article>`).join('');
+
+    for (const b of document.querySelectorAll('.finding button')) {
+      b.onclick = () => writeQuestion(data.findings[+b.dataset.i], +b.dataset.i, b);
+    }
+  }
+
+  // The unidentified boxes are the point, not an error: a wrong name here
+  // becomes a duplicate warning about a drug that is not in the drawer.
+  $('note').innerHTML = data.unreadable.length
+    ? 'Not identified, and deliberately left that way: <span class="unreadable">'
+      + data.unreadable.map(esc).join(' · ') + '</span>'
+    : '';
+}
+
+async function writeQuestion(finding, i, btn) {
+  const box = $('q' + i);
+  box.hidden = false;
+  box.innerHTML = '<span class="who">the Scribe — holds no tools</span>writing…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/question', {
+      method: 'POST', headers: {'content-type': 'application/json'},
+      body: JSON.stringify({ kind: finding.kind, drugs: finding.drugs, detail: finding.detail })
+    });
+    const d = await r.json();
+    box.innerHTML = '<span class="who">the Scribe — holds no tools</span>'
+      + esc(d.ok ? d.question : d.why);
+  } catch (e) {
+    box.innerHTML = '<span class="who">the Scribe</span>' + esc(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
