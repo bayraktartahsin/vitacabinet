@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+*.log
+
+# Credentials — never commit. Nothing here is worth the risk of `git add -A`
+# picking up an AWS key, so the patterns are deliberately wide.
+keys
+keys.*
+*keys.rtf
+.env
+.env.*
+*.pem
+credentials
+.aws/
