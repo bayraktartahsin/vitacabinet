@@ -24,6 +24,10 @@ One handed the same list with no date acts on it.
 
 VitaCabinet is a record that admits what it does not know.
 
+## Architecture
+
+![VitaCabinet architecture](docs/img/architecture.png)
+
 ## What it actually does
 
 1. **Reads the drawer.** Text off each box resolves to a real drug identity via
