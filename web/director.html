@@ -1,0 +1,265 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VitaCabinet — director</title>
+<style>
+  :root {
+    --bg: #0f1720; --panel: #16212c; --line: #263543; --ink: #eef4f8;
+    --muted: #8fa3b3; --live: #5fd08a; --warn: #e8b768; --dead: #c0504d;
+    --accent: #6fb3dd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column;
+  }
+
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 12px 24px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .chip {
+    font-size: 12px; letter-spacing: .09em; text-transform: uppercase;
+    padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+  }
+  .chip.live { color: var(--live); border-color: #2c5a41; }
+  .chip.dead { color: var(--dead); border-color: #5a2f2e; }
+  .chip b { color: var(--ink); }
+  .spacer { flex: 1; }
+  .clock { font: 600 20px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .clock small { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+  .bar { height: 3px; background: var(--line); }
+  .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .1s linear; }
+
+  main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 30px 6vw 20px; }
+
+  .cue {
+    color: var(--warn); font-size: 15px; letter-spacing: .04em; text-transform: uppercase;
+    margin-bottom: 20px; min-height: 22px;
+  }
+  .say {
+    font-size: clamp(26px, 3.6vw, 46px); line-height: 1.34; font-weight: 500;
+    letter-spacing: -0.015em; max-width: 22ch; /* overridden below */
+  }
+  .say { max-width: none; }
+  .next {
+    margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: clamp(15px, 1.5vw, 20px); line-height: 1.45;
+  }
+  .next b { color: #b9c8d4; font-weight: 500; }
+
+  footer {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 12px 24px; border-top: 1px solid var(--line); background: var(--panel);
+    font-size: 13px; color: var(--muted);
+  }
+  kbd {
+    background: var(--bg); border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 2px 7px; font: 12px ui-monospace, Menlo, monospace; color: var(--ink);
+  }
+  button {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+  }
+  button.go { background: var(--accent); color: #08131c; border-color: var(--accent); font-weight: 600; }
+
+  .hold { display: flex; align-items: center; gap: 8px; }
+  .hold .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .hold.waiting .dot { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+
+  #splash {
+    position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px; text-align: center; padding: 30px; z-index: 50;
+  }
+  #splash.gone { display: none; }
+  #splash h1 { margin: 0; font-size: 30px; }
+  #splash p { margin: 0; color: var(--muted); max-width: 56ch; line-height: 1.6; }
+  #splash ol { color: var(--muted); text-align: left; max-width: 56ch; line-height: 1.8; }
+</style>
+
+<div id="splash">
+  <h1>VitaCabinet — director</h1>
+  <p>You read. The app drives itself. Nothing here appears in the recording —
+     keep this window off the part of the screen you are capturing.</p>
+  <ol>
+    <li>Open <b>the app</b> in a second window and put it where you will record.</li>
+    <li>Come back here and press <b>Find the app</b>.</li>
+    <li>Start your screen recording, then press <b>Space</b> to begin.</li>
+  </ol>
+  <div>
+    <button id="openStage">Open the app in a new window</button>
+    <button class="go" id="find">Find the app</button>
+  </div>
+  <p id="splashNote" style="min-height:20px"></p>
+</div>
+
+<header>
+  <span class="chip" id="link">looking for the app…</span>
+  <span class="chip">beat <b id="beatNo">–</b> / <b id="beatTotal">–</b></span>
+  <span class="spacer"></span>
+  <span class="hold" id="holdBox"><i class="dot"></i><span id="holdTxt">ready</span></span>
+  <span class="clock"><span id="elapsed">0:00</span> <small>/ <span id="runtime">–</span></small></span>
+</header>
+<div class="bar"><i id="prog"></i></div>
+
+<main>
+  <div class="cue" id="cue"></div>
+  <div class="say" id="say">Press <kbd>Space</kbd> to start.</div>
+  <div class="next" id="next"></div>
+</main>
+
+<footer>
+  <button class="go" id="next-btn">Next ▸</button>
+  <button id="back-btn">◂ Back</button>
+  <button id="pause-btn">Pause</button>
+  <button id="restart-btn">Restart</button>
+  <span class="spacer"></span>
+  <span><kbd>Space</kbd> next · <kbd>←</kbd> back · <kbd>P</kbd> pause · <kbd>R</kbd> restart</span>
+</footer>
+
+<script type="module">
+import { CHANNEL, SCRIPT, holdFor, newId, makeTicker } from '/autopilot.js';
+
+const $ = id => document.getElementById(id);
+const DIR = newId();
+const bus = new BroadcastChannel(CHANNEL);
+
+/* Hold times come from the words, so editing a line re-times the take. */
+const beats = SCRIPT.map(b => ({ ...b, hold: holdFor(b.say, b.floor) }));
+const RUNTIME = beats.reduce((n, b) => n + b.hold, 0);
+
+let stage = null;      // the claimed stage id
+let idx = -1;          // current beat
+let beatStart = 0;     // ms
+let elapsed = 0;       // ms, whole take
+let paused = true;
+let waiting = null;    // {until, ceiling, arrived}
+
+const mmss = ms => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+};
+
+$('beatTotal').textContent = beats.length;
+$('runtime').textContent = mmss(RUNTIME * 1000);
+
+/* --- finding and claiming the stage ---------------------------------- */
+
+$('openStage').onclick = () => window.open('/', 'vitacabinet-stage');
+
+$('find').onclick = () => {
+  $('splashNote').textContent = 'looking…';
+  bus.postMessage({ t: 'hello', dir: DIR });
+  setTimeout(() => {
+    if (!stage) $('splashNote').textContent =
+      'No app window answered. Open the app first, leave it open, then press Find the app again.';
+  }, 1200);
+};
+
+bus.onmessage = (e) => {
+  const m = e.data || {};
+
+  if (m.t === 'here' && !stage) {
+    stage = m.stage;                       // first to answer wins; only one claim
+    bus.postMessage({ t: 'claim', stage, dir: DIR });
+    return;
+  }
+  if (m.t === 'claimed' && m.stage === stage) {
+    $('link').textContent = 'app connected';
+    $('link').className = 'chip live';
+    $('splash').classList.add('gone');
+    return;
+  }
+  if (m.t === 'done' && m.stage === stage && waiting && m.action === waiting.until) {
+    waiting.arrived = true;                // the screen caught up with the words
+  }
+};
+
+/* --- running the script ---------------------------------------------- */
+
+function send(beat, i) {
+  if (!beat.act || !stage) return;
+  bus.postMessage({ t: 'do', stage, dir: DIR, beat: i, ...beat.act });
+}
+
+function show(i) {
+  idx = i;
+  const b = beats[i];
+  $('beatNo').textContent = i + 1;
+  $('cue').textContent = b.cue || '';
+  $('say').textContent = b.say;
+  const n = beats[i + 1];
+  $('next').innerHTML = n ? `<b>next:</b> ${n.say}` : '<b>last line — then stop talking.</b>';
+
+  waiting = b.until ? { until: b.until, ceiling: (b.ceiling || 30) * 1000, arrived: false } : null;
+  $('holdBox').className = waiting ? 'hold waiting' : 'hold';
+
+  beatStart = performance.now();
+  send(b, i);
+}
+
+function advance() {
+  if (idx + 1 >= beats.length) { paused = true; $('holdTxt').textContent = 'done'; return; }
+  show(idx + 1);
+}
+
+makeTicker(() => {
+  if (paused || idx < 0) return;
+  const now = performance.now();
+  const inBeat = now - beatStart;
+  elapsed += 100;
+
+  const b = beats[idx];
+  const need = b.hold * 1000;
+
+  $('elapsed').textContent = mmss(elapsed);
+  $('prog').style.width = `${Math.min(100, (elapsed / (RUNTIME * 1000)) * 100)}%`;
+
+  if (waiting && !waiting.arrived) {
+    $('holdTxt').textContent = `waiting for the app… ${mmss(waiting.ceiling - inBeat)}`;
+    // The words never run ahead of the screen: hold until the stage reports
+    // done, or until the ceiling, whichever comes first.
+    if (inBeat < waiting.ceiling) return;
+    waiting.arrived = true;
+  }
+
+  const left = need - inBeat;
+  $('holdTxt').textContent = left > 0 ? `next in ${(left / 1000).toFixed(1)}s` : 'go';
+  $('holdBox').className = 'hold';
+  if (left <= 0) advance();
+});
+
+/* --- controls --------------------------------------------------------- */
+
+function start() {
+  if (idx < 0) { elapsed = 0; show(0); }
+  paused = false;
+}
+
+$('next-btn').onclick = () => { if (idx < 0) start(); else { advance(); paused = false; } };
+$('back-btn').onclick = () => { if (idx > 0) show(idx - 1); };
+$('pause-btn').onclick = () => {
+  paused = !paused;
+  $('pause-btn').textContent = paused ? 'Resume' : 'Pause';
+  if (!paused) beatStart = performance.now();
+};
+$('restart-btn').onclick = () => {
+  paused = true; idx = -1; elapsed = 0;
+  $('say').textContent = 'Press Space to start.'; $('cue').textContent = '';
+  $('next').textContent = ''; $('elapsed').textContent = '0:00'; $('prog').style.width = '0';
+  if (stage) bus.postMessage({ t: 'do', stage, dir: DIR, beat: -1, action: 'reset' });
+};
+
+addEventListener('keydown', (e) => {
+  if (e.key === ' ')          { e.preventDefault(); $('next-btn').click(); }
+  else if (e.key === 'ArrowLeft')  $('back-btn').click();
+  else if (e.key.toLowerCase() === 'p') $('pause-btn').click();
+  else if (e.key.toLowerCase() === 'r') $('restart-btn').click();
+});
+
+/* Look for a stage immediately — usually the app window is already open. */
+bus.postMessage({ t: 'hello', dir: DIR });
+</script>

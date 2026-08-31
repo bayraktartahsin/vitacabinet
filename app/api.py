@@ -170,3 +170,30 @@ def question(finding: Finding) -> dict:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB / "index.html")
+
+
+# --------------------------------------------------------------------------
+# The recording rig.
+#
+# /director is the teleprompter and /autopilot.js is the script both pages
+# share. They are served from the same origin as the app on purpose: the two
+# windows talk over a BroadcastChannel, which is same-origin only, and a demo
+# that needs a second server running is a demo that fails on the day.
+#
+# Nothing here changes what a judge sees. The stage only obeys a director that
+# has claimed it, so opening the live URL gives an ordinary app.
+# --------------------------------------------------------------------------
+
+@app.get("/director")
+def director() -> FileResponse:
+    return FileResponse(WEB / "director.html")
+
+
+@app.get("/autopilot.js")
+def autopilot() -> FileResponse:
+    return FileResponse(WEB / "autopilot.js", media_type="text/javascript")
+
+
+@app.get("/architecture.png")
+def architecture() -> FileResponse:
+    return FileResponse(WEB / "architecture.png", media_type="image/png")

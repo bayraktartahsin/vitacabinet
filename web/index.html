@@ -56,6 +56,33 @@
   .empty { color: var(--muted); padding: 26px 0; }
   .note { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; max-width: 68ch; }
   .unreadable { font: 13.5px ui-monospace, Menlo, monospace; color: var(--muted); }
+
+  /* Autopilot: the ring the director points with. Deliberately calm — a
+     flashing outline in a screen recording reads as a glitch, not a cue. */
+  @keyframes lookhere {
+    0%   { box-shadow: 0 0 0 0 rgba(61,126,166,.55); }
+    70%  { box-shadow: 0 0 0 14px rgba(61,126,166,0); }
+    100% { box-shadow: 0 0 0 0 rgba(61,126,166,0); }
+  }
+  .lookhere { animation: lookhere 1.6s ease-out 2; border-radius: 12px; }
+
+  #arch { display: none; margin-top: 26px; }
+  #arch.on { display: block; }
+  #arch img { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  #arch h2 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+  #closing { display: none; margin-top: 26px; padding: 22px 24px; border: 1px solid var(--line);
+             border-left: 4px solid var(--ink); border-radius: 12px; background: var(--card); }
+  #closing.on { display: block; }
+  #closing p { margin: 0; font-size: 17px; line-height: 1.5; }
+  #closing .links { margin-top: 12px; font-size: 14px; color: var(--muted); }
+
+  /* Shown only when a director has claimed this window, so a judge opening the
+     live URL never sees it. */
+  #claimed { display: none; position: fixed; right: 14px; bottom: 14px; z-index: 99;
+             background: var(--ink); color: #fff; font-size: 12px; letter-spacing: .06em;
+             text-transform: uppercase; padding: 7px 12px; border-radius: 999px; }
+  #claimed.on { display: block; }
 </style>
 
 <header>
@@ -85,8 +112,23 @@ shopping list milk</textarea>
     <div class="counts" id="counts"></div>
     <div id="out"><p class="empty">Nothing read yet.</p></div>
     <p class="note" id="note"></p>
+
+    <section id="arch">
+      <h2>How it is built</h2>
+      <img src="/architecture.png" alt="Three agents on the Strands Agents SDK; the Scribe holds no tools.">
+    </section>
+
+    <section id="closing">
+      <p><strong>VitaCabinet does not tell anyone what to take, what to stop, or
+         what to throw away.</strong> It finds what is uncertain in a drawer and
+         writes down the question to ask a pharmacist. That limit is enforced by
+         which agent holds which tool, and it is tested.</p>
+      <p class="links">github.com/bayraktartahsin/vitacabinet &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp; 38 tests, against the live NIH and FDA APIs</p>
+    </section>
   </section>
 </main>
+
+<div id="claimed">on air</div>
 
 <script>
 const DEMO = `Glucophage 500mg
@@ -127,6 +169,7 @@ $('go').onclick = async () => {
 };
 
 function render(data) {
+  lastScan = data;
   const s = data.summary;
   $('counts').innerHTML = [
     ['boxes read', s.medicines],
@@ -161,6 +204,107 @@ function render(data) {
       + data.unreadable.map(esc).join(' · ') + '</span>'
     : '';
 }
+
+/* ------------------------------------------------------------------ *
+ * Autopilot receiver.
+ *
+ * This page is the stage. The director page holds the words and the clock;
+ * everything here is a hand it can move. Nothing below runs unless a director
+ * has claimed this window, so the live URL behaves like an ordinary app for
+ * anyone who just opens it.
+ *
+ * A BroadcastChannel reaches every tab on this origin, which is exactly how a
+ * previous version of this fired one click into six tabs. So: roll-call, one
+ * claim, and every message after that carries the claimed id.
+ * ------------------------------------------------------------------ */
+const STAGE_ID = Math.random().toString(36).slice(2, 10);
+let claimedBy = null;
+let lastScan = null;
+
+const bus = new BroadcastChannel('vitacabinet-autopilot');
+
+function tell(t, extra) {
+  bus.postMessage({ t, stage: STAGE_ID, ...(extra || {}) });
+}
+
+function ring(el) {
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('lookhere');
+  void el.offsetWidth;                       // restart the animation
+  el.classList.add('lookhere');
+}
+
+const ACTIONS = {
+  reset() {
+    $('boxes').value = DEMO;
+    $('out').innerHTML = '<p class="empty">Nothing read yet.</p>';
+    $('counts').innerHTML = '';
+    $('note').textContent = '';
+    $('arch').classList.remove('on');
+    $('closing').classList.remove('on');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+
+  async scan() {
+    await $('go').onclick();                 // the same path a person clicks
+  },
+
+  focus(args) {
+    const kind = args && args.kind;
+    if (kind === 'counts')     return ring($('counts'));
+    if (kind === 'unreadable') return ring($('note'));
+    if (kind === 'decay')      return ring($('arch'));
+    const card = [...document.querySelectorAll('.finding')]
+      .find(f => f.querySelector('.tag')?.textContent.trim() === kind);
+    ring(card);
+  },
+
+  async question(args) {
+    const kind = (args && args.kind) || 'duplicate';
+    const i = (lastScan?.findings || []).findIndex(f => f.kind === kind);
+    if (i < 0) return;
+    const card = document.querySelector(`#q${i}`)?.closest('.finding');
+    ring(card);
+    const btn = document.querySelector(`.finding button[data-i="${i}"]`);
+    if (btn) await writeQuestion(lastScan.findings[i], i, btn);
+  },
+
+  architecture() {
+    $('arch').classList.add('on');
+    ring($('arch'));
+  },
+
+  closing() {
+    $('closing').classList.add('on');
+    ring($('closing'));
+  },
+};
+
+bus.onmessage = async (e) => {
+  const m = e.data || {};
+
+  // Roll-call: answer any director looking for a stage.
+  if (m.t === 'hello') return tell('here');
+
+  // One claim, and only one. A second director cannot steal a live take.
+  if (m.t === 'claim' && m.stage === STAGE_ID && !claimedBy) {
+    claimedBy = m.dir;
+    $('claimed').classList.add('on');
+    return tell('claimed');
+  }
+
+  if (m.t !== 'do' || m.stage !== STAGE_ID || m.dir !== claimedBy) return;
+
+  const fn = ACTIONS[m.action];
+  if (!fn) return tell('done', { beat: m.beat, action: m.action, ok: false });
+  try {
+    await fn(m.args);
+    tell('done', { beat: m.beat, action: m.action, ok: true });
+  } catch (err) {
+    tell('done', { beat: m.beat, action: m.action, ok: false, why: String(err).slice(0, 120) });
+  }
+};
 
 async function writeQuestion(finding, i, btn) {
   const box = $('q' + i);
