@@ -10,7 +10,10 @@ Meanwhile every *formal* record of the same drawer is a photograph of a moment p
 
 So I built **VitaCabinet**: a record that admits what it does not know, and a small fleet of agents that work through what it is unsure about.
 
-This post is about the three things that went wrong while building it, because those turned out to be the design.
+It is live, if you want to poke at it before reading any further — no install, no sign-up:
+**https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com**
+
+This post is about the four things that went wrong while building it, because those turned out to be the design.
 
 ---
 
@@ -165,8 +168,51 @@ What falls out is a **queue** rather than a form — things worth one question e
 
 ---
 
+## The public URL that would not go public
+
+The last failure was pure infrastructure, and I am writing it down because I could not find it written down anywhere.
+
+The app is FastAPI, so the deploy is a Lambda with a four-line Mangum adapter — no container, no second implementation, nothing about the deployed behaviour that the tests do not already exercise:
+
+```python
+from mangum import Mangum
+from .api import app
+
+handler = Mangum(app, lifespan="off")
+```
+
+A Lambda Function URL is the obvious front door. I created one with `AuthType: NONE` and attached exactly the resource policy AWS documents:
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": "*",
+  "Action": "lambda:InvokeFunctionUrl",
+  "Resource": "arn:aws:lambda:eu-north-1:...:function:vitacabinet",
+  "Condition": { "StringEquals": { "lambda:FunctionUrlAuthType": "NONE" } }
+}
+```
+
+It returned `403 AccessDeniedException` to every anonymous request.
+
+What I checked before giving up, in case it saves somebody an afternoon: the console renders the policy without complaint; `GetPolicy` and `GetResourcePolicy` both return it intact; the account belongs to no organization, so no SCP or RCP is in play; a direct `lambda:Invoke` of the same function returns `200` with the right body, so the code and the packaging are fine; and deleting and recreating the URL config changes nothing. The block sits above the policy layer and is not visible from the API or the console.
+
+The fix was to stop arguing with it. An API Gateway HTTP API is public by default and needs no resource policy for anonymous callers, so the whole question disappears:
+
+```python
+api_id = api.create_api(
+    Name="vitacabinet", ProtocolType="HTTP",
+    Target=f"arn:aws:lambda:{REGION}:{account}:function:vitacabinet")["ApiId"]
+```
+
+Two things I would tell myself an hour earlier. **Separate the layers before you debug the policy** — one direct `Invoke` returning `200` proved the function was never the problem, and I should have run it first. And **when a managed service refuses in a way its own console cannot explain, take the other road**; API Gateway was the more ordinary way to front a Lambda anyway, and I had talked myself out of it because Function URLs looked simpler.
+
+---
+
 VitaCabinet does not tell anyone what to take, what to stop, or what to throw away. It finds what is uncertain in a drawer and writes down the question to ask a pharmacist. That limit is enforced by which agent holds which tool, and it is tested.
 
-Code, with the Apache 2.0 licence and the full test suite: **https://github.com/bayraktartahsin/vitacabinet**
+Try it: **https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com**
+
+Code, with the Apache 2.0 licence and all 38 tests: **https://github.com/bayraktartahsin/vitacabinet**
 
 Built for the Agents for Humans hackathon with the Strands Agents SDK on Amazon Bedrock.
