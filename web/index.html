@@ -69,7 +69,8 @@
 
   /* ── layout ────────────────────────────────────────────── */
   main{display:grid;grid-template-columns:400px minmax(0,1fr);gap:22px;padding-bottom:60px;align-items:start}
-  @media (max-width:960px){main{grid-template-columns:1fr}}
+  main>div:first-child{position:sticky;top:74px;max-height:calc(100vh - 90px);overflow:auto;scrollbar-width:thin;padding-right:2px}
+  @media (max-width:960px){main{grid-template-columns:1fr} main>div:first-child{position:static;max-height:none;overflow:visible}}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px;margin-bottom:18px;box-shadow:var(--shadow)}
   .panel h2{margin:0;font:600 19px var(--serif);display:flex;align-items:center;gap:10px}
   .panel h2 .n{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:600 12px var(--sans)}
@@ -340,7 +341,7 @@ function drawSaid(said, report) {
   if (report && !report.error)
     $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="Identifier">Identifier's typed report</b> <code>DrawerReport</code> · boxes_read <b>${report.boxes_read}</b> · duplicate_pairs <b>${(report.duplicate_pairs||[]).length}</b> · unreadable <b>${(report.unreadable||[]).length}</b><br>${esc(report.one_line || '')}</div>`);
   for (const [who, text] of Object.entries(said || {})) if (text && !(who === 'Identifier' && report && !report.error))
-    $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="${esc(who)}">${esc(who)} reports:</b> ${esc(text.slice(0, 420))}</div>`);
+    $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="${esc(who)}">${esc(who)} reports:</b> ${esc(text.replace(/\*\*/g, '').replace(/\s*[-•]\s+/g, ' · ').replace(/\s+/g, ' ').slice(0, 360))}${text.length > 360 ? '…' : ''}</div>`);
 }
 
 function render(data) {
@@ -379,7 +380,10 @@ async function writeQuestion(finding, i, btn) {
 
 /* ── the cabinet: a drawer that persists and ages ───────── */
 async function saveDrawer() {
-  const boxes = lines(); if (!boxes.length) return;
+  // A line the Identifier could not confirm as a medicine is not a fact about
+  // anybody's medicines. It stays in the drawer text; it does not enter the record.
+  const bad = new Set(lastScan?.unreadable || []);
+  const boxes = lines().filter(b => !bad.has(b)); if (!boxes.length) return;
   drawer = await post('/drawers', { boxes, owner: 'Mum' });
   showCabinet(drawer); history.replaceState(null, '', '?drawer=' + drawer.id);
   $('cabinet').scrollIntoView({behavior:'smooth', block:'start'});
