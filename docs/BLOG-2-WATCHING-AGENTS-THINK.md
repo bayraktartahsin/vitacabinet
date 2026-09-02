@@ -88,6 +88,24 @@ Strands' `ConcurrentToolExecutor` runs tools on a thread pool. If a pool thread 
 
 The fix was less clever than the bug: a module-level ledger guarded by a lock. Each Lambda invocation is its own process; locally, readings serialise. I wrote down why in the code, because the ContextVar *looks* more correct and the next person will want to put it back.
 
+## Problem five: the agent's report was prose, and prose hides things
+
+With the ledger holding the truth, the Identifier's final message was still a paragraph — nice to read, impossible to check. Strands has `structured_output`, so after the tool loop the same agent is asked for its conclusion as a typed object:
+
+```python
+class DrawerReport(BaseModel):
+    boxes_read: int
+    unreadable: list[str]
+    duplicate_pairs: list[list[str]]
+    one_line: str
+
+report = identifier.structured_output(DrawerReport, "Report what you found. No advice.")
+```
+
+A model that has to fill in `unreadable` cannot bury an unreadable box in a sentence. And now a test can compare the agent's account against the ledger — a report that disagrees with what the tools found is a report worth knowing about.
+
+One live surprise: a drawer with nothing unreadable came back with `unreadable: null`, and the report failed validation *because the drawer was fine*. A `field_validator(mode="before")` that maps `None` to `[]` fixed it. Small models write `null` for "nothing here"; your schema should expect that.
+
 ## Then I moved the agents to AgentCore
 
 With the agents doing real work, the last step was hosting them where AWS suggests: **Amazon Bedrock AgentCore Runtime**. The starter toolkit builds the ARM64 container in CodeBuild, so no Docker on the laptop — which mattered, because there is none.
@@ -99,6 +117,8 @@ agentcore deploy --env VITACABINET_TABLE=vitacabinet
 
 The entrypoint is twenty lines around the same `read_drawer()` the Lambda used. The one design point worth stating: when the payload carries a job id, **the runtime writes the trace to DynamoDB itself**, from inside AgentCore, so the page keeps drawing the agents thinking even though the reading no longer runs next to it. The Lambda's job handler became "invoke the runtime, wait, record the result." Same agents, same tools, same ledger, same trace — one code path, two places it runs.
 
+All three agents run there now — the Scribe too, so no agent runs in a different place from its siblings — with OpenTelemetry enabled, so every reading leaves spans in CloudWatch.
+
 Two things went wrong that will save you an hour: the container failed to start because `bedrock-agentcore` was not in `requirements.txt` (the toolkit installs *your* requirements, not its own), and the auto-created execution role needed an inline policy for the table before the trace could be written from inside the runtime.
 
 ---
@@ -109,7 +129,8 @@ Two things went wrong that will save you an hour: the container failed to start 
 - **Never derive findings from the model's prose or the model's arguments.** Recompute from what the tools actually returned.
 - **A timeout can be a feature.** The async job with a streamed trace is a better product than the synchronous call would have been.
 - **Order-dependent test failures in agent code are usually shared state on executor threads.** Look there first.
+- **Ask the agent for its conclusion as a type, not a paragraph.** Then check it against the tools. And expect `null` where you asked for an empty list.
 
-The code, Apache 2.0, with 60-odd tests that run against the live models and public APIs: **https://github.com/bayraktartahsin/vitacabinet**
+The code, Apache 2.0, with 67 tests that run against the live models and public APIs: **https://github.com/bayraktartahsin/vitacabinet**
 
 VitaCabinet does not tell anyone what to take, what to stop, or what to throw away. It finds what is uncertain in a drawer, keeps watching it, and writes down the question to ask a pharmacist.

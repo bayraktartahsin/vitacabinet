@@ -76,7 +76,9 @@ def set_findings(drawer_id, findings, trace_len):
 
 Only if `new` is non-empty does SNS send an email. The same recall showing up again tomorrow is not news. A message every night is how people stop reading the one that matters — which is the single most important product decision in the whole thing, and it is four lines.
 
-The page shows it plainly: *Watchman last checked: 03:12 today · 0 new · 13 findings · 5 tool calls · runs nightly via EventBridge.* Zero new is the normal, good outcome. The design has to make silence look like success.
+The page shows it plainly: *Watchman last checked: 03:12 today · 0 new · 14 findings · 7 tool calls · runs nightly via EventBridge.* Zero new is the normal, good outcome. The design has to make silence look like success.
+
+There is a drawer the Watchman has already visited, if you want to see the history without waiting: **https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com/?drawer=b2c20c522b** — six boxes, one fact confirmed by the person, two passes in the log, the second with nothing new.
 
 ## A recall is against batches, never against a medicine
 
