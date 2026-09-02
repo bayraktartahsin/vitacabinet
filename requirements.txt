@@ -12,3 +12,6 @@ pytest==9.1.1
 
 # Lambda adapter — the deployed app is the same FastAPI app, not a rewrite.
 mangum==0.22.0
+
+# AgentCore Runtime host — the same agents served from Bedrock AgentCore
+bedrock-agentcore==1.22.0

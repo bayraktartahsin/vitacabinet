@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -75,8 +76,20 @@ def policy(account: str) -> dict:
             {"Effect": "Allow",
              "Resource": f"arn:aws:lambda:{REGION}:{account}:function:{FUNCTION}",
              "Action": ["lambda:InvokeFunction"]},
+            {"Effect": "Allow", "Resource": "*",
+             "Action": ["bedrock-agentcore:InvokeAgentRuntime"]},
         ],
     }
+
+
+def agentcore_arn() -> str | None:
+    """The runtime the toolkit deployed, if it has. Read from its config so
+    the two deploys cannot disagree about which runtime is live."""
+    cfg = ROOT / ".bedrock_agentcore.yaml"
+    if not cfg.exists():
+        return None
+    m = re.search(r"agent_arn:\s*(arn:aws:bedrock-agentcore:\S+)", cfg.read_text())
+    return m.group(1) if m else None
 
 
 def say(msg: str) -> None:
@@ -125,6 +138,8 @@ def ensure_role(iam) -> str:
     try:
         arn = iam.get_role(RoleName=ROLE)["Role"]["Arn"]
         say(f"role exists: {ROLE}")
+        if agentcore_arn():
+            say(f"agents on AgentCore: {agentcore_arn().rsplit('/', 1)[-1]}")
     except ClientError as e:
         if e.response["Error"]["Code"] != "NoSuchEntity":
             raise
@@ -202,6 +217,7 @@ def ensure_function(lam, role_arn: str, code: bytes, topic_arn: str) -> None:
             "VITACABINET_TOPIC": topic_arn,
             "VITACABINET_FUNCTION": FUNCTION,
             "VITACABINET_TESTS": str(count_tests()),
+            **({"VITACABINET_AGENTCORE_ARN": agentcore_arn()} if agentcore_arn() else {}),
         }},
     )
     try:

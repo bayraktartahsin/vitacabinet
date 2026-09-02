@@ -42,20 +42,50 @@ ON_LAMBDA = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 # ---------------------------------------------------------------------------
 
 
+AGENTCORE_ARN = os.getenv("VITACABINET_AGENTCORE_ARN")
+
+
+def read_on_agentcore(boxes: list[str], jid: str) -> dict:
+    """The reading, run by the fleet on Bedrock AgentCore Runtime.
+
+    The runtime writes the trace to the job itself as the tools fire, so the
+    page keeps drawing the agents thinking; this side only waits for the
+    finished result. A session id per job keeps readings apart on the runtime.
+    """
+    import json
+    import boto3
+    client = boto3.client("bedrock-agentcore")
+    r = client.invoke_agent_runtime(
+        agentRuntimeArn=AGENTCORE_ARN,
+        runtimeSessionId=f"vitacabinet-job-{jid}-{'x' * 20}"[:64].ljust(33, "x"),
+        contentType="application/json", accept="application/json",
+        payload=json.dumps({"action": "read", "boxes": boxes, "job": jid}).encode())
+    body = r["response"].read() if hasattr(r.get("response"), "read") else r.get("response", b"")
+    result = json.loads(body or b"{}")
+    if "error" in result and "findings" not in result:
+        raise RuntimeError(result["error"])
+    result["ran_on"] = "bedrock-agentcore"
+    return result
+
+
 def run_job(jid: str) -> None:
     """The background half of a scan. Called by a second Lambda invocation in
-    the cloud and by a thread locally; identical either way."""
-    from .agents.run import read_drawer          # imported late: Strands is slow to load
-
+    the cloud and by a thread locally; identical either way. The agents run on
+    AgentCore when a runtime is configured, and in-process otherwise."""
     job = store.get_job(jid)
     if not job:
         return
     store.job_started(jid)
     try:
-        result = read_drawer(
-            job["boxes"],
-            on_step=lambda s: store.job_step(jid, s),
-            say=lambda agent, text: store.job_said(jid, agent, text))
+        if AGENTCORE_ARN:
+            result = read_on_agentcore(job["boxes"], jid)
+        else:
+            from .agents.run import read_drawer          # imported late: Strands is slow to load
+            result = read_drawer(
+                job["boxes"],
+                on_step=lambda s: store.job_step(jid, s),
+                say=lambda agent, text: store.job_said(jid, agent, text))
+            result["ran_on"] = "lambda"
         if job.get("drawer_id"):
             diff = store.set_findings(job["drawer_id"], result["findings"], len(result["trace"]))
             result["new_since_last_check"] = diff["new"]
@@ -139,7 +169,8 @@ TESTS = int(os.getenv("VITACABINET_TESTS", "0"))   # stamped at deploy time
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "store": store.backend_name(), "lambda": ON_LAMBDA, "tests": TESTS}
+    return {"ok": True, "store": store.backend_name(), "lambda": ON_LAMBDA, "tests": TESTS,
+            "agents_on": "bedrock-agentcore" if AGENTCORE_ARN else ("lambda" if ON_LAMBDA else "local")}
 
 
 @app.post("/scan")
