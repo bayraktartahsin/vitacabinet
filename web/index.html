@@ -1,151 +1,263 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f6f2">
 <title>VitaCabinet</title>
 <style>
-  :root {
-    --ink:#12232e; --muted:#5a6b78; --line:#dbe3e9; --paper:#fbfcfd; --card:#fff;
-    --accent:#3d7ea6; --high:#c0504d; --high-bg:#fdecec; --med:#c98b3a; --med-bg:#fdf3e7;
-    --low:#5f8a63; --low-bg:#eef3ee; --ident:#3d7ea6; --watch:#c98b3a; --scribe:#c0504d;
+  :root{
+    --paper:#f7f6f2; --card:#ffffff; --ink:#16232b; --muted:#66727c; --faint:#98a3ab; --line:#e4e7e9; --line2:#d3d8dc;
+    --ident:#2f6f9f; --ident-bg:#eaf2f8; --watch:#b7791f; --watch-bg:#fbf3e4; --scribe:#b3453f; --scribe-bg:#fbeceb;
+    --ok:#3f7d57; --ok-bg:#eaf3ed; --high:#b3453f; --high-bg:#fbeceb; --med:#b7791f; --med-bg:#fbf3e4; --low:#3f7d57; --low-bg:#eaf3ed;
+    --shadow:0 1px 2px rgba(20,30,40,.05),0 10px 30px rgba(20,30,40,.06);
+    --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-  header{padding:30px 32px 20px;border-bottom:1px solid var(--line);background:var(--card);display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
-  header .t{flex:1;min-width:320px}
-  h1{margin:0;font-size:30px;letter-spacing:-.02em}
-  header p{margin:6px 0 0;color:var(--muted);max-width:66ch}
-  .stack{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
-  .stack b{color:var(--ink)}
-  .stack span{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--card)}
-  main{display:grid;grid-template-columns:400px 1fr;gap:26px;padding:26px 32px 70px;align-items:start}
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important} html{scroll-behavior:auto}}
+  a{color:var(--ident)}
+  button{font:inherit;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;border-radius:12px;border:1px solid transparent;font-weight:650;font-size:15px;line-height:1;transition:transform .08s ease,box-shadow .15s ease,background .15s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--ink);color:#fff;box-shadow:0 6px 18px rgba(22,35,43,.18)} .btn-primary:hover{background:#0f1a21}
+  .btn-secondary{background:var(--card);color:var(--ink);border-color:var(--line2)} .btn-secondary:hover{border-color:var(--ink)}
+  .btn-ghost{background:transparent;color:var(--ident);border-color:var(--line);padding:8px 12px;font-size:13px;font-weight:600}
+  .btn-ghost:hover{border-color:var(--ident)}
+  .btn-tiny{padding:6px 10px;font-size:12px;border-radius:9px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:12.5px;color:var(--muted)}
+  .chip b{color:var(--ink);font-weight:650}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+
+  /* ── top bar ───────────────────────────────────────────── */
+  .top{position:sticky;top:0;z-index:20;background:rgba(247,246,242,.86);backdrop-filter:saturate(1.2) blur(10px);border-bottom:1px solid var(--line)}
+  .top .in{max-width:1180px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+  .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;display:grid;place-items:center;font:700 15px var(--serif)}
+  .brand b{font:650 19px/1 var(--serif);letter-spacing:-.01em}
+  .brand small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .top .sp{flex:1}
+  #health{display:flex;gap:8px;flex-wrap:wrap}
+  @media (max-width:640px){#health .opt{display:none} .brand small{display:none}}
+
+  /* ── hero ──────────────────────────────────────────────── */
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  #hero{padding:56px 0 26px;display:grid;grid-template-columns:1.15fr .85fr;gap:36px;align-items:center}
+  #hero.gone{display:none}
+  #hero h1{font:600 clamp(32px,4.2vw,50px)/1.08 var(--serif);letter-spacing:-.02em;margin:0 0 14px}
+  #hero h1 em{font-style:italic;color:var(--ident)}
+  #hero p{margin:0 0 22px;color:var(--muted);font-size:17px;max-width:56ch}
+  #hero .ctas{display:flex;gap:10px;flex-wrap:wrap}
+  #hero .aside{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;box-shadow:var(--shadow)}
+  #hero .aside h3{margin:0 0 10px;font:600 15px var(--serif)}
+  .agents{display:grid;gap:8px}
+  .agent{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start;padding:9px 10px;border-radius:12px;border:1px solid var(--line)}
+  .agent .av{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font:700 13px var(--serif);color:#fff}
+  .agent.identifier .av{background:var(--ident)} .agent.watchman .av{background:var(--watch)} .agent.scribe .av{background:var(--scribe)}
+  .agent b{display:block;font-size:14px} .agent span{font-size:12.5px;color:var(--muted)}
+  .agent code{font:11.5px var(--mono);background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  @media (max-width:900px){#hero{grid-template-columns:1fr;padding-top:34px}}
+
+  /* ── stepper ───────────────────────────────────────────── */
+  #steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 22px}
+  .st{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13.5px;transition:all .25s}
+  .st i{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);display:grid;place-items:center;font:600 12px var(--sans);flex:none}
+  .st.on{border-color:var(--ink);color:var(--ink)} .st.on i{background:var(--ink);border-color:var(--ink);color:#fff}
+  .st.done{color:var(--ink)} .st.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+  @media (max-width:760px){#steps{grid-template-columns:1fr 1fr} .st{font-size:12.5px}}
+
+  /* ── layout ────────────────────────────────────────────── */
+  main{display:grid;grid-template-columns:400px minmax(0,1fr);gap:22px;padding-bottom:60px;align-items:start}
   @media (max-width:960px){main{grid-template-columns:1fr}}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px}
-  .panel h2{margin:0 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-  .panel .hint{margin:0 0 12px;font-size:13.5px;color:var(--muted)}
-  textarea{width:100%;min-height:190px;padding:12px;border:1px solid var(--line);border-radius:8px;font:14px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);resize:vertical;background:#fff}
-  button{margin-top:10px;width:100%;padding:12px 16px;border:0;border-radius:8px;background:var(--ink);color:#fff;font-size:15px;font-weight:600;cursor:pointer}
-  button:disabled{opacity:.55;cursor:default}
-  button.ghost{width:auto;margin:8px 8px 0 0;padding:7px 12px;font-size:13px;font-weight:500;background:transparent;color:var(--accent);border:1px solid var(--line)}
-  button.tiny{width:auto;margin:0;padding:4px 10px;font-size:12px;font-weight:500;background:transparent;color:var(--accent);border:1px solid var(--line)}
-  .drop{display:block;border:1.5px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--muted);font-size:13.5px;cursor:pointer;margin-top:10px}
-  .drop.on{border-color:var(--accent);color:var(--accent)}
-  .drop input{display:none}
-  .counts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
-  .count{border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted);background:var(--card)}
-  .count b{color:var(--ink)}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px;margin-bottom:18px;box-shadow:var(--shadow)}
+  .panel h2{margin:0;font:600 19px var(--serif);display:flex;align-items:center;gap:10px}
+  .panel h2 .n{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:600 12px var(--sans)}
+  .panel .hint{margin:6px 0 14px;font-size:13.5px;color:var(--muted)}
+  .panel .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap} .panel .hd .sp{flex:1}
 
-  /* the agents, thinking */
-  #trace{margin-bottom:18px}
-  .step{display:grid;grid-template-columns:96px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;animation:in .35s ease-out}
-  @keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-  .step .who{font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
-  .step .who.Identifier{color:var(--ident)} .step .who.Watchman{color:var(--watch)} .step .who.Scribe{color:var(--scribe)}
-  .step code{font:12.5px ui-monospace,Menlo,monospace;color:var(--ink)}
-  .step .said{color:var(--muted);margin-top:2px}
-  .step .ms{color:var(--muted);font-size:12px;margin-left:6px}
-  .thinking{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13.5px;padding:10px 0}
-  .thinking i{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:blink 1s infinite}
-  @keyframes blink{50%{opacity:.2}}
-  .summary{margin-top:12px;padding:12px 14px;border-left:3px solid var(--line);color:var(--muted);font-size:14px}
-  .summary b{color:var(--ink)} .summary code{font:12px ui-monospace,Menlo,monospace;background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  textarea{width:100%;min-height:172px;padding:12px 14px;border:1px solid var(--line2);border-radius:12px;font:14px/1.75 var(--mono);color:var(--ink);resize:vertical;background:#fff;transition:border .15s,box-shadow .15s}
+  textarea:focus{outline:none;border-color:var(--ident);box-shadow:0 0 0 3px rgba(47,111,159,.15)}
+  .drop{display:block;border:1.5px dashed var(--line2);border-radius:14px;padding:18px 14px;text-align:center;color:var(--muted);font-size:14px;cursor:pointer;margin:0 0 12px;background:var(--paper);transition:all .15s}
+  .drop:hover,.drop.on{border-color:var(--ident);color:var(--ident);background:var(--ident-bg)}
+  .drop input{display:none} .drop b{display:block;color:var(--ink);font-size:15px;margin-bottom:3px}
+  #photos{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px} #photos img{height:56px;border-radius:8px;border:1px solid var(--line)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px} .row .btn{flex:1}
+  .row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 
-  .finding{border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:16px 18px;margin-bottom:12px;background:var(--card)}
+  /* ── counts ────────────────────────────────────────────── */
+  .counts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;min-height:0}
+  .count{display:inline-flex;align-items:baseline;gap:6px;padding:7px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:13px;color:var(--muted);animation:in .35s ease-out}
+  .count b{font:650 17px var(--serif);color:var(--ink)}
+  .count.alert{border-color:var(--high);background:var(--high-bg)} .count.alert b{color:var(--high)}
+
+  /* ── the agents, thinking ──────────────────────────────── */
+  #trace{display:grid;gap:0}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:13.5px;animation:in .35s ease-out;position:relative}
+  .step:last-child{border-bottom:0}
+  .step .av{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font:700 11px var(--serif);color:#fff;margin-top:2px}
+  .step .who{font-weight:650;font-size:12px;letter-spacing:.05em;text-transform:uppercase;margin-right:8px}
+  .step.Identifier .av{background:var(--ident)} .step.Identifier .who{color:var(--ident)}
+  .step.Watchman .av{background:var(--watch)} .step.Watchman .who{color:var(--watch)}
+  .step code{font:12.5px var(--mono);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+  .step .said{color:var(--muted);margin-top:4px;line-height:1.45}
+  .step .ms{color:var(--faint);font-size:12px;margin-left:8px;font-variant-numeric:tabular-nums}
+  .thinking{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13.5px;padding:12px 4px}
+  .thinking i{width:8px;height:8px;border-radius:50%;background:var(--ident);animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.2}} @keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .summary{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--paper);border:1px solid var(--line);color:var(--muted);font-size:14px;line-height:1.5}
+  .summary b{color:var(--ink)} .summary b.Identifier{color:var(--ident)} .summary b.Watchman{color:var(--watch)}
+  .summary code{font:12px var(--mono);background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .empty{color:var(--muted);padding:18px 4px;font-size:14.5px}
+  .empty.big{padding:26px 4px;text-align:center}
+  .empty.big .ico{font-size:28px;margin-bottom:6px}
+
+  /* ── findings ──────────────────────────────────────────── */
+  .finding{border:1px solid var(--line);border-left-width:5px;border-radius:14px;padding:16px 18px;margin-bottom:12px;background:var(--card);animation:in .35s ease-out}
   .finding.high{border-left-color:var(--high);background:var(--high-bg)}
   .finding.medium{border-left-color:var(--med);background:var(--med-bg)}
   .finding.low{border-left-color:var(--low);background:var(--low-bg)}
-  .finding.new::after{content:"new since last check";float:right;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--high);font-weight:700}
-  .finding h3{margin:0 0 6px;font-size:17px}
-  .finding p{margin:0;color:var(--muted);font-size:14.5px}
-  .tag{display:inline-block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-  .lots{margin-top:8px;font:13px ui-monospace,Menlo,monospace;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 10px;display:inline-block}
-  .question{margin-top:12px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:8px;font-size:15px}
-  .question .who{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--scribe);margin-bottom:5px}
+  .finding .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .finding .tag{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:650}
+  .finding .new{margin-left:auto;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--high);font-weight:700;background:#fff;border:1px solid var(--high);border-radius:999px;padding:2px 8px}
+  .finding h3{margin:0 0 6px;font:600 19px var(--serif);letter-spacing:-.01em}
+  .finding p{margin:0;color:var(--muted);font-size:14.5px;line-height:1.5}
+  .lots{margin-top:10px;font:13px var(--mono);color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 11px;display:inline-block}
+  .finding .acts{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  .question{margin-top:12px;padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:12px;font:17px/1.5 var(--serif)}
+  .question .who{display:block;font:650 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--scribe);margin-bottom:6px}
+  .question .qa{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  .note{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+  .unreadable{font:13px var(--mono);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
 
-  /* the cabinet: facts that age */
-  .fact{display:grid;grid-template-columns:1fr 120px auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
-  .fact .s{font-weight:600}
-  .fact .w{font-size:12.5px;color:var(--muted)}
-  .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
-  .bar i{display:block;height:100%;background:var(--low)}
+  /* ── the cabinet ───────────────────────────────────────── */
+  #cabinet,#arch,#closing{display:none} #cabinet.on,#arch.on,#closing.on{display:block}
+  .cabsum{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .fact{display:grid;grid-template-columns:1fr 110px auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);animation:in .3s ease-out}
+  .fact:last-child{border-bottom:0}
+  .fact .s{font-weight:650;font-size:15px} .fact .w{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .bar{height:9px;background:var(--line);border-radius:5px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--ok);border-radius:5px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
   .fact.stale .bar i{background:var(--med)}
-  .fact.stale .s::after{content:" · worth asking about";font-weight:400;color:var(--med);font-size:12.5px}
-  .watch{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13.5px;color:var(--muted);margin-top:12px}
-  .watch b{color:var(--ink)}
-  .subscribe{display:flex;gap:8px;margin-top:10px}
-  .subscribe input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:14px}
+  .fact.stale .s::after{content:"  worth asking about";font-weight:500;color:var(--med);font-size:12.5px}
+  .watch{display:grid;gap:8px;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--paper);border:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+  .watch b{color:var(--ink)} .watch .zero{color:var(--ok);font-weight:650}
+  .hist{display:flex;gap:4px;align-items:flex-end;height:18px} .hist i{width:8px;border-radius:2px;background:var(--line2)} .hist i.new{background:var(--high)}
+  .subscribe{display:flex;gap:8px;margin-top:12px}
+  .subscribe input{flex:1;padding:9px 12px;border:1px solid var(--line2);border-radius:10px;font-size:14px}
+  .subscribe input:focus{outline:none;border-color:var(--ident);box-shadow:0 0 0 3px rgba(47,111,159,.15)}
 
-  .empty{color:var(--muted);padding:22px 0}
-  .note{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;max-width:70ch}
-  .unreadable{font:13.5px ui-monospace,Menlo,monospace;color:var(--muted)}
-  @keyframes lookhere{0%{box-shadow:0 0 0 0 rgba(61,126,166,.55)}70%{box-shadow:0 0 0 14px rgba(61,126,166,0)}100%{box-shadow:0 0 0 0 rgba(61,126,166,0)}}
-  .lookhere{animation:lookhere 1.6s ease-out 2;border-radius:12px}
-  #arch,#closing,#cabinet{display:none} #arch.on,#closing.on,#cabinet.on{display:block}
   #arch img{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff}
-  #closing{padding:22px 24px;border:1px solid var(--line);border-left:4px solid var(--ink);border-radius:12px;background:var(--card)}
-  #closing p{margin:0;font-size:17px;line-height:1.5} #closing .links{margin-top:12px;font-size:14px;color:var(--muted)}
-  #photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px} #photos img{height:54px;border-radius:6px;border:1px solid var(--line)}
+  #closing{padding:22px 24px;border-left:5px solid var(--ink)}
+  #closing p{margin:0;font:400 19px/1.5 var(--serif)} #closing .links{margin-top:12px;font:14px var(--sans);color:var(--muted)}
+
+  /* ── footer ────────────────────────────────────────────── */
+  footer{border-top:1px solid var(--line);padding:22px 24px 40px;color:var(--muted);font-size:13px}
+  footer .in{max-width:1180px;margin:0 auto;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+  footer .sp{flex:1}
+
+  @keyframes lookhere{0%{box-shadow:0 0 0 0 rgba(47,111,159,.55)}70%{box-shadow:0 0 0 14px rgba(47,111,159,0)}100%{box-shadow:0 0 0 0 rgba(47,111,159,0)}}
+  .lookhere{animation:lookhere 1.6s ease-out 2;border-radius:14px}
+  .sr{position:absolute;left:-9999px}
 </style>
 
-<header>
-  <div class="t">
-    <h1>VitaCabinet</h1>
-    <p>Photograph the boxes, or type what is printed on them. Three agents read the
-       drawer against RxNorm and the FDA record, keep watching it, and write down the
-       question to ask a pharmacist. It does not tell you what to take.</p>
-  </div>
-  <div class="stack">
-    <span><b>Strands Agents</b> · 3 agents</span><span><b>Bedrock</b> Nova Lite</span>
-    <span><b>Lambda</b> + API Gateway</span><span><b>DynamoDB</b></span><span><b>EventBridge</b> nightly</span><span><b>SNS</b></span>
-  </div>
-</header>
+<div class="top"><div class="in">
+  <a class="brand" href="/"><span class="mark">V</span><span><b>VitaCabinet</b><small>a record that admits what it does not know</small></span></a>
+  <span class="sp"></span>
+  <div id="health" aria-live="polite"></div>
+</div></div>
 
-<main>
-  <div>
-    <section class="panel">
-      <h2>The drawer</h2>
-      <p class="hint">One box per line, exactly as printed — or drop photos and let the model read them.</p>
-      <label class="drop" id="drop">📷 Photograph the boxes — drop images here, or tap to choose
-        <input type="file" id="files" accept="image/*" multiple capture="environment">
-      </label>
-      <div id="photos"></div>
-      <textarea id="boxes" spellcheck="false">Glucophage 500mg
+<div class="wrap">
+  <section id="hero">
+    <div>
+      <h1>Photograph the medicine drawer.<br>Three agents will <em>read it</em>, keep watching it, and write down what to ask.</h1>
+      <p>A brand and its generic side by side. A batch recalled last month. A list nobody has confirmed since March. VitaCabinet finds what is uncertain and turns each thing into one question for a pharmacist. It never tells you what to take.</p>
+      <div class="ctas">
+        <button class="btn btn-primary" id="tryit">▶ Try it on the demo drawer</button>
+        <button class="btn btn-secondary" id="photo-cta">📷 Photograph my drawer</button>
+      </div>
+    </div>
+    <aside class="aside">
+      <h3>Three agents, and what each is allowed to hold</h3>
+      <div class="agents">
+        <div class="agent identifier"><div class="av">Id</div><div><b>Identifier</b><span>reads each box against RxNorm at the NIH · <code>identify_medicine</code> <code>find_duplicate_medicines</code></span></div></div>
+        <div class="agent watchman"><div class="av">W</div><div><b>Watchman</b><span>checks the FDA record, nightly · <code>check_for_recalls</code></span></div></div>
+        <div class="agent scribe"><div class="av">S</div><div><b>Scribe</b><span>writes the question for a pharmacist · <code>holds no tools</code> — so it cannot advise</span></div></div>
+      </div>
+    </aside>
+  </section>
+
+  <nav id="steps" aria-label="Steps">
+    <div class="st on" data-s="1"><i>1</i>The drawer</div>
+    <div class="st" data-s="2"><i>2</i>The agents read it</div>
+    <div class="st" data-s="3"><i>3</i>Worth a question</div>
+    <div class="st" data-s="4"><i>4</i>Keep and watch</div>
+  </nav>
+
+  <main>
+    <div>
+      <section class="panel" id="p-drawer">
+        <h2><span class="n">1</span>The drawer</h2>
+        <p class="hint">Drop photos and let Nova Lite read the labels, or type one box per line exactly as printed.</p>
+        <label class="drop" id="drop"><b>📷 Photograph the boxes</b>drop images here, or tap to use the camera
+          <input type="file" id="files" accept="image/*" multiple capture="environment"></label>
+        <div id="photos"></div>
+        <textarea id="boxes" spellcheck="false" aria-label="Boxes, one per line">Glucophage 500mg
 Metformin 500 mg
 Atorvastatin 20mg
 Ramipril 5mg
 Norvasc 5mg
 Aspirin 75mg
 shopping list milk</textarea>
-      <button id="go">Read the drawer</button>
-      <button class="ghost" id="demo">Reset to the demo drawer</button>
-      <button class="ghost" id="save">Keep this drawer and watch it</button>
-    </section>
+        <div class="row"><button class="btn btn-primary" id="go">Read the drawer</button></div>
+        <div class="row2"><button class="btn btn-ghost" id="demo">Use the demo drawer</button><button class="btn btn-ghost" id="save">Keep this drawer and watch it</button></div>
+      </section>
 
-    <section class="panel" id="cabinet">
-      <h2>The cabinet · <span id="owner"></span></h2>
-      <p class="hint">Every fact carries its source and its age. What decays below half is worth one question.</p>
-      <div id="facts"></div>
-      <div class="watch" id="watch"></div>
-      <button class="ghost" id="checknow">Run the Watchman now</button>
-      <div class="subscribe"><input id="email" type="email" placeholder="email me only when something is new"><button class="tiny" id="sub">Watch</button></div>
-      <p class="hint" id="subnote" style="margin-top:8px"></p>
-    </section>
-  </div>
+      <section class="panel" id="cabinet">
+        <h2><span class="n">4</span>The cabinet <span style="font:500 14px var(--sans);color:var(--muted)">· <span id="owner"></span></span></h2>
+        <p class="hint">Every fact carries its source and its age. What decays below half is worth one question.</p>
+        <div class="cabsum" id="cabsum"></div>
+        <div id="facts"></div>
+        <div class="watch" id="watch"></div>
+        <div class="row2"><button class="btn btn-ghost" id="checknow">Run the Watchman now</button></div>
+        <div class="subscribe"><input id="email" type="email" placeholder="email me only when something is new" aria-label="Email"><button class="btn btn-secondary btn-tiny" id="sub">Watch</button></div>
+        <p class="hint" id="subnote" style="margin:8px 0 0"></p>
+      </section>
+    </div>
 
-  <section>
-    <div class="counts" id="counts"></div>
-    <div id="trace"></div>
-    <div id="out"><p class="empty">Nothing read yet.</p></div>
-    <p class="note" id="note"></p>
-    <section id="arch" class="panel" style="margin-top:22px"><h2>How it is built</h2>
-      <img src="/architecture.png" alt="Three agents on the Strands Agents SDK; the Scribe holds no tools."></section>
-    <section id="closing">
-      <p><strong>VitaCabinet does not tell anyone what to take, what to stop, or what to throw away.</strong>
-         It finds what is uncertain in a drawer, keeps watching it, and writes down the question to ask a pharmacist.
-         That limit is enforced by which agent holds which tool, and it is tested.</p>
-      <p class="links">github.com/bayraktartahsin/vitacabinet &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp; <span id="ntests">tests</span> against the live NIH and FDA APIs</p>
-    </section>
-  </section>
-</main>
+    <div>
+      <section class="panel" id="p-agents">
+        <div class="hd"><h2><span class="n">2</span>The agents read it</h2><span class="sp"></span><span class="chip opt" id="tracechip" hidden><b id="tc">0</b> tool calls · <b id="ts">0</b>s</span></div>
+        <p class="hint">Every row is a real tool call, as it happens, with what the tool said back and how long it took.</p>
+        <div class="counts" id="counts"></div>
+        <div id="trace"><div class="empty big"><div class="ico">🗂️</div>Nothing read yet. Press <b>Read the drawer</b>, or try the demo above.</div></div>
+      </section>
+
+      <section class="panel" id="p-findings">
+        <h2><span class="n">3</span>Worth a question</h2>
+        <p class="hint">A double dose first, because it is happening now. Then live recalls with the lot to check. Then the boxes nobody could read.</p>
+        <div id="out"><p class="empty">Findings appear here, most urgent first.</p></div>
+        <p class="note" id="note"></p>
+      </section>
+
+      <section id="arch" class="panel"><h2>How it is built</h2><p class="hint">Strands Agents on Bedrock AgentCore · Lambda + API Gateway · DynamoDB · EventBridge · SNS · Nova Lite</p>
+        <img src="/architecture.png" alt="Three agents on the Strands Agents SDK; the Scribe holds no tools."></section>
+      <section id="closing" class="panel">
+        <p><strong>VitaCabinet does not tell anyone what to take, what to stop, or what to throw away.</strong>
+           It finds what is uncertain in a drawer, keeps watching it, and writes down the question to ask a pharmacist.
+           That limit is enforced by which agent holds which tool, and it is tested.</p>
+        <p class="links">github.com/bayraktartahsin/vitacabinet &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp; <span id="ntests">tests</span> against the live NIH and FDA APIs</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<footer><div class="in">
+  <span>Identity from <b>RxNorm</b> (NIH) · recalls from <b>openFDA</b> · agents on <b>Strands</b> + <b>Bedrock AgentCore</b></span>
+  <span class="sp"></span>
+  <span>Not medical advice. Ask a pharmacist.</span>
+  <a href="https://github.com/bayraktartahsin/vitacabinet">Source, Apache 2.0</a>
+</div></footer>
 
 <script>
 const DEMO = `Glucophage 500mg\nMetformin 500 mg\nAtorvastatin 20mg\nRamipril 5mg\nNorvasc 5mg\nAspirin 75mg\nshopping list milk`;
@@ -154,14 +266,23 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const post = (u, b) => fetch(u, {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(b)}).then(r => r.json());
 let lastScan = null, drawer = null, pollTimer = null;
 
-$('demo').onclick = () => { $('boxes').value = DEMO; $('photos').innerHTML = ''; };
+/* ── product flow ───────────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('#steps .st').forEach(el => { const s = +el.dataset.s; el.classList.toggle('on', s === n); el.classList.toggle('done', s < n); });
+}
+function hideHero() { $('hero').classList.add('gone'); }
+$('demo').onclick = () => { $('boxes').value = DEMO; $('photos').innerHTML = ''; setStep(1); };
+$('photo-cta').onclick = () => $('files').click();
+$('tryit').onclick = async () => { hideHero(); await readPhotos([await sampleFile()]); await scan(drawer?.id, 'shopping list milk'); };
+async function sampleFile() { const b = await (await fetch('/sample-drawer.jpg')).blob(); return new File([b], 'drawer.jpg', {type:'image/jpeg'}); }
 
-/* --- photos -> label text (Nova Lite vision) ---------------------------- */
+/* ── photos → label text (Nova Lite vision) ─────────────── */
 async function readPhotos(files) {
   if (!files.length) return;
+  hideHero(); setStep(1);
   $('drop').classList.add('on'); $('drop').firstChild.textContent = '📷 Reading the labels…';
   const fd = new FormData(); [...files].slice(0, 6).forEach(f => fd.append('images', f));
-  $('photos').innerHTML = [...files].slice(0, 6).map(f => `<img src="${URL.createObjectURL(f)}">`).join('');
+  $('photos').innerHTML = [...files].slice(0, 6).map(f => `<img src="${URL.createObjectURL(f)}" alt="">`).join('');
   try {
     const r = await (await fetch('/read-label', {method:'POST', body: fd})).json();
     if (r.boxes?.length) $('boxes').value = r.boxes.join('\n');
@@ -174,20 +295,25 @@ $('drop').ondragover = e => { e.preventDefault(); $('drop').classList.add('on');
 $('drop').ondragleave = () => $('drop').classList.remove('on');
 $('drop').ondrop = e => { e.preventDefault(); readPhotos(e.dataTransfer.files); };
 
-/* --- reading the drawer: a job, polled, drawn as it grows --------------- */
+/* ── reading the drawer: a job, polled, drawn as it grows ── */
 function lines() { return $('boxes').value.split('\n').map(s => s.trim()).filter(Boolean); }
-
-async function scan(drawerId) {
+async function scan(drawerId, add) {
+  if (add && !lines().includes(add)) $('boxes').value = lines().concat([add]).join('\n');
   const boxes = lines(); if (!boxes.length) return;
+  hideHero(); setStep(2);
   $('go').disabled = true; $('go').textContent = 'The agents are reading…';
-  $('out').innerHTML = ''; $('counts').innerHTML = ''; $('note').textContent = '';
+  $('out').innerHTML = '<p class="empty">Findings appear here, most urgent first.</p>'; $('counts').innerHTML = ''; $('note').textContent = '';
+  $('tracechip').hidden = true;
   $('trace').innerHTML = '<div class="thinking"><i></i>Identifier is opening the drawer…</div>';
+  $('p-agents').scrollIntoView({behavior:'smooth', block:'start'});
+  const t0 = performance.now();
   const { job_id } = await post('/scan', { boxes: boxes.map(text => ({text})), drawer_id: drawerId || null });
   return new Promise(resolve => {
     let seen = 0;
     const tick = async () => {
       const j = await (await fetch('/jobs/' + job_id)).json();
-      if (j.trace.length > seen) { j.trace.slice(seen).forEach(drawStep); seen = j.trace.length; }
+      if (j.trace.length > seen) { j.trace.slice(seen).forEach(drawStep); seen = j.trace.length; $('tracechip').hidden = false; $('tc').textContent = seen; }
+      $('ts').textContent = Math.round((performance.now() - t0) / 1000);
       const last = j.trace[j.trace.length - 1];
       const th = document.querySelector('.thinking');
       if (th && last) th.lastChild.textContent = last.agent === 'Watchman' ? 'Watchman is checking the FDA record…' : 'Identifier is reading the boxes…';
@@ -203,69 +329,76 @@ $('go').onclick = () => scan(drawer?.id);
 
 function drawStep(s) {
   const th = document.querySelector('.thinking');
-  const el = document.createElement('div'); el.className = 'step';
+  const el = document.createElement('div'); el.className = 'step ' + esc(s.agent);
   const arg = s.input ? Object.values(s.input)[0] : '';
-  el.innerHTML = `<div class="who ${esc(s.agent)}">${esc(s.agent)}</div>
-    <div><code>${esc(s.tool)}(${esc(Array.isArray(arg) ? arg.length + ' boxes' : JSON.stringify(arg))})</code><span class="ms">${s.ms ? s.ms + ' ms' : ''}</span>
+  el.innerHTML = `<div class="av">${s.agent === 'Watchman' ? 'W' : 'Id'}</div>
+    <div><span class="who">${esc(s.agent)}</span><code>${esc(s.tool)}(${esc(Array.isArray(arg) ? arg.length + ' boxes' : JSON.stringify(arg))})</code><span class="ms">${s.ms ? s.ms + ' ms' : ''}</span>
     <div class="said">${esc(s.said)}</div></div>`;
   th ? $('trace').insertBefore(el, th) : $('trace').appendChild(el);
 }
 function drawSaid(said, report) {
   if (report && !report.error)
-    $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="Identifier">Identifier's typed report</b>
-      <code>DrawerReport</code> · boxes_read <b>${report.boxes_read}</b> · duplicate_pairs <b>${(report.duplicate_pairs||[]).length}</b> · unreadable <b>${(report.unreadable||[]).length}</b><br>${esc(report.one_line || '')}</div>`);
+    $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="Identifier">Identifier's typed report</b> <code>DrawerReport</code> · boxes_read <b>${report.boxes_read}</b> · duplicate_pairs <b>${(report.duplicate_pairs||[]).length}</b> · unreadable <b>${(report.unreadable||[]).length}</b><br>${esc(report.one_line || '')}</div>`);
   for (const [who, text] of Object.entries(said || {})) if (text && !(who === 'Identifier' && report && !report.error))
     $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="${esc(who)}">${esc(who)} reports:</b> ${esc(text.slice(0, 420))}</div>`);
 }
 
 function render(data) {
-  lastScan = data;
+  lastScan = data; setStep(3);
   const kinds = k => data.findings.filter(f => f.kind === k).length;
   const newKeys = new Set((data.new_since_last_check || []).map(f => f.key));
-  $('counts').innerHTML = [['boxes read', data.drugs.length], ['duplicates', kinds('duplicate')], ['live recalls', kinds('recall')],
-    ['ingredients checked', data.ingredients_checked.length], ['unreadable', data.unreadable.length], ['tool calls', data.trace.length], ['seconds', data.seconds]]
-    .map(([k, v]) => `<span class="count"><b>${v}</b> ${k}</span>`).join('');
+  const c = [['boxes read', data.drugs.length], ['duplicate', kinds('duplicate'), 'alert'], ['live recalls', kinds('recall')],
+             ['ingredients checked', data.ingredients_checked.length], ['unreadable', data.unreadable.length], ['tool calls', data.trace.length], ['seconds', data.seconds]];
+  $('counts').innerHTML = c.map(([k, v, cls]) => `<span class="count ${cls && v ? cls : ''}"><b>${v}</b> ${k}</span>`).join('');
   $('out').innerHTML = data.findings.length ? data.findings.map((f, i) => `
-    <article class="finding ${esc(f.severity)} ${newKeys.has(f.key) ? 'new' : ''}">
-      <span class="tag">${esc(f.kind)}</span><h3>${esc(f.headline)}</h3><p>${esc(f.detail)}</p>
+    <article class="finding ${esc(f.severity)}">
+      <div class="top"><span class="tag">${esc(f.kind)}</span>${newKeys.has(f.key) ? '<span class="new">new since last check</span>' : ''}</div>
+      <h3>${esc(f.headline)}</h3><p>${esc(f.detail)}</p>
       ${f.lots ? `<div class="lots">Check the box for: ${esc(f.lots)}</div>` : ''}
-      <button class="ghost" data-i="${i}">Write the question to ask</button>
+      <div class="acts"><button class="btn btn-ghost" data-i="${i}">✎ Write the question to ask</button></div>
       <div class="question" id="q${i}" hidden></div></article>`).join('')
-    : '<p class="empty">Nothing in this drawer is worth a question today.</p>';
-  document.querySelectorAll('.finding button').forEach(b => b.onclick = () => writeQuestion(data.findings[+b.dataset.i], +b.dataset.i, b));
-  $('note').innerHTML = data.unreadable.length ? 'Not identified, and deliberately left that way: <span class="unreadable">' + data.unreadable.map(esc).join(' · ') + '</span>' : '';
+    : '<div class="empty big"><div class="ico">✅</div>Nothing in this drawer is worth a question today.</div>';
+  document.querySelectorAll('.finding .acts button').forEach(b => b.onclick = () => writeQuestion(data.findings[+b.dataset.i], +b.dataset.i, b));
+  $('note').innerHTML = data.unreadable.length ? 'Not identified, and deliberately left that way: ' + data.unreadable.map(u => `<span class="unreadable">${esc(u)}</span>`).join(' ') + ' — a wrong name here would become a recall alert for a drug nobody takes.' : '';
+  $('p-findings').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 async function writeQuestion(finding, i, btn) {
   const box = $('q' + i); box.hidden = false; btn.disabled = true;
   box.innerHTML = '<span class="who">the Scribe — holds no tools</span>writing…';
-  try { const d = await post('/question', { kind: finding.kind, drugs: finding.drugs, detail: finding.detail });
-        box.innerHTML = '<span class="who">the Scribe — holds no tools</span>' + esc(d.ok ? d.question : d.why); }
-  catch (e) { box.innerHTML = '<span class="who">the Scribe</span>' + esc(e.message); }
+  try {
+    const d = await post('/question', { kind: finding.kind, drugs: finding.drugs, detail: finding.detail });
+    const q = d.ok ? d.question : d.why;
+    box.innerHTML = `<span class="who">the Scribe — holds no tools</span>${esc(q)}
+      <div class="qa"><button class="btn btn-ghost btn-tiny" data-copy>Copy for the pharmacist</button>${'speechSynthesis' in window ? '<button class="btn btn-ghost btn-tiny" data-say>🔊 Read aloud</button>' : ''}</div>`;
+    box.querySelector('[data-copy]').onclick = e => { navigator.clipboard?.writeText(q); e.target.textContent = 'Copied'; };
+    box.querySelector('[data-say]')?.addEventListener('click', () => { const u = new SpeechSynthesisUtterance(q); u.rate = .95; speechSynthesis.cancel(); speechSynthesis.speak(u); });
+  } catch (e) { box.innerHTML = '<span class="who">the Scribe</span>' + esc(e.message); }
   btn.disabled = false;
 }
 
-/* --- the cabinet: a drawer that persists and ages ----------------------- */
+/* ── the cabinet: a drawer that persists and ages ───────── */
 async function saveDrawer() {
   const boxes = lines(); if (!boxes.length) return;
   drawer = await post('/drawers', { boxes, owner: 'Mum' });
-  showCabinet(drawer);
-  history.replaceState(null, '', '?drawer=' + drawer.id);
+  showCabinet(drawer); history.replaceState(null, '', '?drawer=' + drawer.id);
+  $('cabinet').scrollIntoView({behavior:'smooth', block:'start'});
 }
 $('save').onclick = saveDrawer;
-
 function showCabinet(d) {
-  drawer = d; $('cabinet').classList.add('on'); $('owner').textContent = d.owner;
+  drawer = d; $('cabinet').classList.add('on'); $('owner').textContent = d.owner; setStep(4); hideHero();
+  const conf = d.facts.filter(f => !f.stale).length;
+  $('cabsum').innerHTML = `<span class="chip"><b>${d.facts.length}</b> facts</span><span class="chip"><span class="dot"></span><b>${conf}</b> confident</span><span class="chip"><b>${d.stale_count}</b> worth asking</span>`;
   $('facts').innerHTML = d.facts.map(f => `<div class="fact ${f.stale ? 'stale' : ''}">
     <div><div class="s">${esc(f.subject)}</div><div class="w">${esc(f.why)}</div></div>
-    <div class="bar"><i style="width:${Math.round(f.confidence * 100)}%"></i></div>
-    <button class="tiny" data-s="${esc(f.subject)}">Confirm</button></div>`).join('');
+    <div class="bar" title="${Math.round(f.confidence*100)}% believed"><i style="width:${Math.round(f.confidence * 100)}%"></i></div>
+    <button class="btn btn-ghost btn-tiny" data-s="${esc(f.subject)}">Confirm</button></div>`).join('');
   document.querySelectorAll('#facts button').forEach(b => b.onclick = async () => showCabinet(await post(`/drawers/${d.id}/confirm`, { subject: b.dataset.s })));
   const when = d.last_checked ? new Date(d.last_checked * 1000).toLocaleString() : 'never';
   const last = (d.history || []).slice(-1)[0];
-  $('watch').innerHTML = `<span>Watchman last checked: <b>${esc(when)}</b></span>` +
-    (last ? `<span><b>${last.new}</b> new · <b>${last.findings}</b> findings · <b>${last.tool_calls}</b> tool calls</span>` : '') +
-    `<span>runs nightly via EventBridge · <b>${d.subscribers}</b> watching</span>`;
+  const hist = (d.history || []).slice(-12).map(h => `<i class="${h.new ? 'new' : ''}" style="height:${Math.max(4, Math.min(18, 4 + h.findings))}px" title="${h.new} new"></i>`).join('');
+  $('watch').innerHTML = `<div>Watchman last checked: <b>${esc(when)}</b>${last ? ` · <span class="${last.new ? '' : 'zero'}"><b>${last.new}</b> new</span> · <b>${last.findings}</b> findings · <b>${last.tool_calls}</b> tool calls` : ''}</div>
+    <div style="display:flex;gap:10px;align-items:center"><span class="hist">${hist}</span><span>runs nightly via EventBridge · emails only when something is new · <b>${d.subscribers}</b> watching</span></div>`;
 }
 $('checknow').onclick = async () => { if (drawer) { await scan(drawer.id); showCabinet(await (await fetch('/drawers/' + drawer.id)).json()); } };
 $('sub').onclick = async () => {
@@ -277,10 +410,12 @@ $('sub').onclick = async () => {
 (async () => {
   const id = new URLSearchParams(location.search).get('drawer');
   if (id) { const r = await fetch('/drawers/' + id); if (r.ok) { const d = await r.json(); showCabinet(d); $('boxes').value = d.boxes.join('\n'); } }
-  try { const h = await (await fetch('/health')).json(); if (h.tests) $('ntests').textContent = h.tests + ' tests'; } catch {}
+  try { const h = await (await fetch('/health')).json();
+    $('health').innerHTML = `<span class="chip"><span class="dot"></span> live</span><span class="chip opt">agents on <b>${esc(h.agents_on === 'bedrock-agentcore' ? 'Bedrock AgentCore' : h.agents_on)}</b></span>${h.tests ? `<span class="chip opt"><b>${h.tests}</b> live tests</span>` : ''}`;
+    if (h.tests) $('ntests').textContent = h.tests + ' tests'; } catch {}
 })();
 
-/* --- autopilot receiver (recording rig) -------------------------------- *
+/* ── autopilot receiver (recording rig) ─────────────────── *
  * This page is the stage; /director holds the words and the clock. Nothing
  * here runs unless a director has claimed this window, so the live URL is an
  * ordinary app for anyone who just opens it. Messages are addressed to one
@@ -292,24 +427,18 @@ const bus = new BroadcastChannel('vitacabinet-autopilot');
 const tell = (t, extra) => bus.postMessage({ t, stage: STAGE_ID, ...(extra || {}) });
 function ring(el) { if (!el) return; el.scrollIntoView({behavior:'smooth', block:'center'}); el.classList.remove('lookhere'); void el.offsetWidth; el.classList.add('lookhere'); }
 const ACTIONS = {
-  reset() { $('boxes').value = DEMO; $('photos').innerHTML = ''; $('out').innerHTML = '<p class="empty">Nothing read yet.</p>'; $('counts').innerHTML = ''; $('trace').innerHTML = ''; $('note').textContent = '';
-           $('arch').classList.remove('on'); $('closing').classList.remove('on'); $('cabinet').classList.remove('on'); drawer = null; history.replaceState(null, '', '/'); window.scrollTo({top:0, behavior:'smooth'}); },
-  async photo() {            // a real vision call on a bundled photo of the demo drawer
-    const blob = await (await fetch('/sample-drawer.jpg')).blob();
-    const f = new File([blob], 'drawer.jpg', {type:'image/jpeg'});
-    ring($('drop')); await readPhotos([f]);
-  },
-  async scan(a) {            // the photo gave six real boxes; the script adds the one that is not a medicine
-    if (a?.add && !lines().includes(a.add)) $('boxes').value = lines().concat([a.add]).join('\n');
-    await scan(drawer?.id); },
+  reset() { $('boxes').value = DEMO; $('photos').innerHTML = ''; $('out').innerHTML = '<p class="empty">Findings appear here, most urgent first.</p>'; $('counts').innerHTML = ''; $('trace').innerHTML = '<div class="empty big"><div class="ico">🗂️</div>Nothing read yet.</div>'; $('note').textContent = ''; $('tracechip').hidden = true;
+           $('arch').classList.remove('on'); $('closing').classList.remove('on'); $('cabinet').classList.remove('on'); drawer = null; history.replaceState(null, '', '/'); $('hero').classList.add('gone'); setStep(1); window.scrollTo({top:0, behavior:'smooth'}); },
+  async photo() { ring($('drop')); await readPhotos([await sampleFile()]); },
+  async scan(a) { await scan(drawer?.id, a?.add); },
   focus(a) { const k = a?.kind;
     if (k === 'counts') return ring($('counts')); if (k === 'trace') return ring($('trace')); if (k === 'unreadable') return ring($('note'));
     if (k === 'decay') return ring($('arch')); if (k === 'facts') return ring($('facts')); if (k === 'watch') return ring($('watch'));
     ring([...document.querySelectorAll('.finding')].find(f => f.querySelector('.tag')?.textContent.trim() === k)); },
   async question(a) { const i = (lastScan?.findings || []).findIndex(f => f.kind === (a?.kind || 'duplicate')); if (i < 0) return;
-    ring(document.querySelector(`#q${i}`)?.closest('.finding')); const b = document.querySelector(`.finding button[data-i="${i}"]`); if (b) await writeQuestion(lastScan.findings[i], i, b); },
+    ring(document.querySelector(`#q${i}`)?.closest('.finding')); const b = document.querySelector(`.finding .acts button[data-i="${i}"]`); if (b) await writeQuestion(lastScan.findings[i], i, b); },
   async save() { await saveDrawer(); ring($('cabinet')); },
-  async confirm(a) { if (!drawer) return;          // 'Norvasc' matches 'Norvasc 5 mg' however the label was read
+  async confirm(a) { if (!drawer) return;
     const want = (a?.subject || drawer.boxes[0]).toLowerCase();
     const subject = drawer.boxes.find(b => b.toLowerCase().startsWith(want)) || drawer.boxes[0];
     showCabinet(await post(`/drawers/${drawer.id}/confirm`, { subject })); ring($('facts')); },
