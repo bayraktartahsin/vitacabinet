@@ -25,8 +25,9 @@ are capturing. **This window must never be visible in the recording.**
 
 **3. Check the top-left of the director says `APP CONNECTED` in green.**
 
-If it says something else, press **Find the app**. If it still does not connect,
-close both windows and open the app first, then the director.
+Either order works, and reloading the app window is fine — the director notices
+and reconnects within about two seconds. If it says **`app lost`**, reload the
+app window and it will pick it up again.
 
 **4. Start your screen recording.** Capture only the app window.
 

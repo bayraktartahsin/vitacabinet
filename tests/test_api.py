@@ -155,10 +155,25 @@ def test_the_pitch_covers_what_the_judges_are_told_to_look_for():
     assert "cue: \"why it matters" in js
 
 
-def test_the_stage_ignores_a_director_that_has_not_claimed_it():
+def test_the_stage_only_obeys_the_director_that_claimed_it():
     """A BroadcastChannel reaches every tab on the origin. Without addressing,
-    one click fires into every open window — which is exactly what happened the
-    first time this was built, six tabs and six of everything."""
+    one click fires into every open window — six tabs, six of everything, which
+    is exactly what happened the first time this was built."""
     page = client.get("/").text
     assert "m.stage !== STAGE_ID" in page, "commands are not addressed to one stage"
-    assert "!claimedBy" in page, "a second director could steal a live take"
+    assert "m.dir !== claimedBy" in page, "an unclaimed stage would still obey"
+
+
+def test_the_stage_announces_itself_so_the_open_order_does_not_matter():
+    """The failure this guards against looked like success: open the director
+    first and it broadcasts its roll-call into an empty room, then sits on a
+    stale claim showing a green 'app connected' badge while the app on screen
+    does nothing at all. The stage now announces on load, and the director
+    re-claims whatever answers — so reloading the app window recovers too."""
+    page = client.get("/").text
+    assert "\ntell('here');" in page, "the stage never announces itself on load"
+    assert "m.t === 'ping'" in page, "the stage cannot answer a liveness check"
+
+    director = client.get("/director").text
+    assert "m.stage !== stage" in director, "the director will not re-claim a reloaded stage"
+    assert "app lost" in director, "a dead stage would still show as connected"

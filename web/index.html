@@ -281,14 +281,26 @@ const ACTIONS = {
   },
 };
 
+// Announce on load. Without this, a director opened BEFORE the app sends its
+// roll-call into an empty room and then sits on a stale claim forever — which
+// looks exactly like "connected, but nothing happens".
+tell('here');
+
 bus.onmessage = async (e) => {
   const m = e.data || {};
 
   // Roll-call: answer any director looking for a stage.
   if (m.t === 'hello') return tell('here');
 
-  // One claim, and only one. A second director cannot steal a live take.
-  if (m.t === 'claim' && m.stage === STAGE_ID && !claimedBy) {
+  // Liveness. The director needs to know this window is still the one it is
+  // talking to, and a green badge that only reports the last good news is
+  // worse than no badge.
+  if (m.t === 'ping' && m.stage === STAGE_ID) return tell('pong');
+
+  // Last claim wins, deliberately. Reloading the app window gives it a new
+  // id, and refusing the new claim is how the director ends up cheerfully
+  // driving a page that no longer exists.
+  if (m.t === 'claim' && m.stage === STAGE_ID) {
     claimedBy = m.dir;
     $('claimed').classList.add('on');
     return tell('claimed');

@@ -86,7 +86,8 @@
      keep this window off the part of the screen you are capturing.</p>
   <ol>
     <li>Open <b>the app</b> in a second window and put it where you will record.</li>
-    <li>Come back here and press <b>Find the app</b>.</li>
+    <li>This screen connects on its own — either order works, and reloading the
+        app window is fine. <b>Find the app</b> is only there if you are impatient.</li>
     <li>Start your screen recording, then press <b>Space</b> to begin.</li>
   </ol>
   <div>
@@ -137,6 +138,8 @@ let beatStart = 0;     // ms
 let elapsed = 0;       // ms, whole take
 let paused = true;
 let waiting = null;    // {until, ceiling, arrived}
+let lastPong = 0;      // ms, last time the stage answered
+let lastPing = 0;
 
 const mmss = ms => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -159,17 +162,27 @@ $('find').onclick = () => {
   }, 1200);
 };
 
+function setLink(state, text) {
+  $('link').textContent = text;
+  $('link').className = 'chip' + (state ? ' ' + state : '');
+}
+
 bus.onmessage = (e) => {
   const m = e.data || {};
 
-  if (m.t === 'here' && !stage) {
-    stage = m.stage;                       // first to answer wins; only one claim
+  // A stage announcing itself always wins the claim. Reloading the app window
+  // gives it a fresh id, and holding on to the old one is how this ends up
+  // driving a page that no longer exists — green badge, dead screen.
+  if (m.t === 'here' && m.stage !== stage) {
+    stage = m.stage;
     bus.postMessage({ t: 'claim', stage, dir: DIR });
     return;
   }
+  if (m.t === 'pong' && m.stage === stage) { lastPong = performance.now(); return; }
+
   if (m.t === 'claimed' && m.stage === stage) {
-    $('link').textContent = 'app connected';
-    $('link').className = 'chip live';
+    lastPong = performance.now();
+    setLink('live', 'app connected');
     $('splash').classList.add('gone');
     return;
   }
@@ -207,6 +220,23 @@ function advance() {
 }
 
 makeTicker(() => {
+  // Liveness first, and outside the paused check: the badge has to be honest
+  // while you are setting up, which is exactly when the app window gets
+  // reloaded or closed.
+  const t = performance.now();
+  if (stage && t - lastPing > 2000) {
+    lastPing = t;
+    bus.postMessage({ t: 'ping', stage, dir: DIR });
+  }
+  if (stage && t - lastPong > 6000) {
+    setLink('dead', 'app lost — reload the app window');
+    stage = null;
+  }
+  if (!stage && t - lastPing > 2000) {
+    lastPing = t;
+    bus.postMessage({ t: 'hello', dir: DIR });   // keep looking, don't give up
+  }
+
   if (paused || idx < 0) return;
   const now = performance.now();
   const inBeat = now - beatStart;
