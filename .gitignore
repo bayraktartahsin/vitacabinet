@@ -27,3 +27,7 @@ credentials
 
 # macOS
 .DS_Store
+
+# AgentCore toolkit build artefacts and logs
+.bedrock_agentcore/
+.agentcore-deploy.log

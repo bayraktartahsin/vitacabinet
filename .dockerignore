@@ -1,0 +1,13 @@
+# What the AgentCore build must not ship. The venv alone is 300MB.
+.venv/
+.build/
+.git/
+.pytest_cache/
+__pycache__/
+*.rtf
+*keys*
+.bedrock_agentcore/
+docs/
+tests/
+web/*.jpg
+web/*.png

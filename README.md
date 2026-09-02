@@ -1,57 +1,66 @@
 # VitaCabinet
 
-**Photograph the medicine boxes in a drawer. VitaCabinet finds the duplicates, the
-live recalls, and the drugs nobody has confirmed in months — then keeps watching,
-in the background, for years.**
+**Photograph the medicine boxes in a drawer. Three agents read it, keep watching it,
+and write down the question to ask a pharmacist. It never tells anyone what to take.**
 
 **Live: https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com**
 
-Built for the AWS *Agents for Humans* hackathon with the
+Built for the AWS *Agents for Humans* hackathon (Everyday Agents track) with the
 [Strands Agents SDK](https://strandsagents.com) on Amazon Bedrock.
 
 ---
 
 ## The problem, stated exactly
 
-Ask anyone to name every medicine in their parent's drawer, with strengths. Almost
+Ask anyone to name every medicine in their mother's drawer, with strengths. Almost
 nobody can. The drawer is the real record, and it is a mess: a brand and its generic
-sitting side by side, something a cardiologist stopped last spring that nobody threw
-away, a box from a batch that was recalled four months ago.
+side by side, something a cardiologist stopped last spring that nobody threw away, a
+box from a batch that was recalled four months ago.
 
 Every formal record of the same drawer is a photograph of a moment, presented as
-though it were current. A GP's list is what was true in March. A hospital's is from
-the night of an admission. **Neither of them says so** — and that unmarked confidence
-is the hazard, not the staleness. A clinician who knows a list is six months old asks.
-One handed the same list with no date acts on it.
+though it were current. A GP's list is what was true in March. **Neither says so** —
+and that unmarked confidence is the hazard, not the staleness. A clinician who knows
+a list is six months old asks. One handed the same list with no date acts on it.
 
-VitaCabinet is a record that admits what it does not know.
+VitaCabinet is a record that admits what it does not know — and a small fleet of
+agents that keep reducing what it is unsure about, in the background, for as long as
+the drawer exists.
 
 ## Architecture
 
 ![VitaCabinet architecture](docs/img/architecture.png)
 
-## What it actually does
+## What it does, in the order you see it
 
-1. **Reads the drawer.** Text off each box resolves to a real drug identity via
-   [RxNorm](https://lhncbc.nlm.nih.gov/RxNav/) (NIH). A box it cannot confirm is
-   reported as unreadable — never guessed at.
-2. **Finds the duplicates.** A brand and its generic share an ingredient; two
-   different drugs never do. Somebody sent home on the brand and repeated on the
-   generic is taking a double dose, and it is invisible by name.
-3. **Watches the safety record.** A scheduled agent checks
-   [openFDA enforcement](https://open.fda.gov/apis/drug/enforcement/) for *live*
-   recalls naming an ingredient in the drawer, and reports the affected lot numbers
-   so somebody can check the box in front of them.
-4. **Writes the question.** Each finding becomes one plain sentence a person can
-   read aloud at a pharmacy counter. Not advice — a question.
+1. **Photograph the boxes.** Amazon Nova Lite reads the printed name and strength off
+   each box. It *reads*; it does not identify. Identity comes next, from an outside
+   authority, so every fact can say where it came from.
+2. **The Identifier reads the drawer** — a Strands agent calling `identify_medicine`
+   once per box against [RxNorm](https://lhncbc.nlm.nih.gov/RxNav/) (NIH), then
+   `find_duplicate_medicines` across all of them. A box it cannot confirm is reported
+   as unreadable, never guessed.
+3. **The Watchman checks the safety record** — a second agent calling
+   `check_for_recalls` once per ingredient against
+   [openFDA enforcement](https://open.fda.gov/apis/drug/enforcement/), live recalls
+   only, lot numbers carried, combination products flagged.
+4. **You watch them work.** Every tool call is written to the job as it happens and
+   the page draws the trace while the agents are still running — tool, argument,
+   what the tool said back, how long it took.
+5. **Keep the drawer.** Facts go to DynamoDB carrying their source and age. A box in a
+   drawer is believed for 60 days; a pharmacy dispensing record for 180. Confirming a
+   fact moves it to the person and resets it.
+6. **It keeps watching.** EventBridge runs the Watchman nightly over every kept
+   drawer. SNS emails only when something is *new* — by finding, not by count.
+7. **The Scribe writes the question.** One plain sentence per finding, for a
+   pharmacist. It holds no tools.
 
 ## The two ideas worth stealing
 
-### 1. Confidence is stored, not assumed
+### Confidence is stored, not assumed
 
-Nothing is stored as a bare fact. Every entry carries where it came from and when it
-was last confirmed, and answers how much it should still be believed
-([`app/cabinet.py`](app/cabinet.py)):
+Nothing is a bare fact ([`app/cabinet.py`](app/cabinet.py)). Every entry carries where
+it came from and when it was last confirmed, and answers how much it should still be
+believed — a straight line to zero over a horizon that depends on the source:
 
 | Source | Believed for |
 | --- | --- |
@@ -61,113 +70,94 @@ was last confirmed, and answers how much it should still be believed
 | a box photographed in the drawer | 60 days |
 | inferred from other facts | 30 days |
 
-A pharmacy dispensing record earns a long horizon because collecting a prescription
-is evidence of taking it. A box in a drawer earns a short one, because a box in a
-drawer is evidence that it was *bought*, and nothing more. Two sources disagreeing
-caps confidence low no matter how fresh the fact is — a conflict found this morning
-is not a strong fact.
+Two sources disagreeing caps confidence low however fresh the fact. What falls out is
+a **queue** — things worth one question each, least believable first — which is a
+shape a background agent can work through for years.
 
-The decay is a straight line to zero, deliberately. Precision here would be false:
-the honest claim is "this is probably stale", not "this is 41% true".
+### The safety boundary is a capability, not a paragraph
 
-The result is a **queue**, not a form: things worth one question each,
-least-believable first.
-
-### 2. The safety boundary is a capability, not a paragraph
-
-Three agents, split along lines that actually matter
-([`app/agents/fleet.py`](app/agents/fleet.py)):
+Three agents, split along lines that actually matter ([`app/agents/fleet.py`](app/agents/fleet.py)):
 
 | Agent | Why it is separate | Tools it holds |
 | --- | --- | --- |
-| **Identifier** | its truth comes from an outside authority, and must be able to say "I could not read this" | `identify_medicine`, `find_duplicate_medicines` |
+| **Identifier** | its truth comes from an outside authority, and it must be able to say "I could not read this" | `identify_medicine`, `find_duplicate_medicines` |
 | **Watchman** | runs on a schedule, not in a request — recalls arrive when they arrive | `check_for_recalls` |
 | **Scribe** | writes to a human, so it must never form a medical opinion | **none** |
 
-That last row is the safety model. An agent able to look up whether a drug is
-dangerous will eventually write the answer down as advice, however firmly its prompt
-says otherwise. So the Scribe is not given the lookup. It is handed a finding that has
-already been established and turns it into a question.
-
-It is a one-line assertion rather than a paragraph of policy
-([`tests/test_fleet.py`](tests/test_fleet.py)):
+An agent that can look up whether a drug is dangerous will eventually write the
+answer down as advice, however firmly its prompt says otherwise. So the Scribe is not
+given the lookup. The rule is a one-line assertion, not a policy:
 
 ```python
 def test_the_scribe_holds_no_tools_at_all():
     assert tools.SCRIBE_TOOLS == []
 ```
 
-## Three things that went wrong, and what they taught
+## How the agents are wired (the part that is easy to get wrong)
 
-**The fuzzy matcher named a chemical that was not there.** RxNav's approximate
-matcher always returns *something*. Given `"qqqzzz not a medicine 12345"` it returned
-**bisphenol A**. The score is not a usable filter either — `"shopping list milk"`
-scored **11.8** against real `"Atorvastatin 20mg"` at **11.7**. The fix is a
-round-trip: take the candidate's own name back and require at least half the query's
-words to appear in it. Without that guard, `"shopping list milk"` resolves to *cow
-milk allergenic extract*, and a wrong identity here becomes a recall alert about a
-drug the person does not take.
+**Tools tell the model one sentence and write the full result to a ledger.** The first
+version returned the whole openFDA payload to the model; thirteen live recalls of
+amlodipine blew straight through Nova's output budget. Now `check_for_recalls`
+returns *"metformin: 23 live recalls, 4 of them combination products, newest…"* to
+the model and the structured records to a per-reading ledger the app assembles
+findings from ([`app/agents/tools.py`](app/agents/tools.py)). The model orchestrates;
+the data never passes through it.
 
-**A recall is against batches, never against a medicine.** The openFDA enforcement
-record sets three traps. Most of it is history — metformin has 91 records and two
-thirds are terminated, so presenting a closed 2013 recall as news teaches the reader
-to ignore the next one, which may not be closed. Every live record is against named
-lots, so the actionable part is the lot number and not the drug name. And searching
-`metformin` returns *Synjardy XR* — empagliflozin **and** metformin — so somebody on
-plain metformin has not been affected, and saying otherwise is a false alarm about a
-drug they need. Hence: live recalls only, lots carried on the type, combination
-products flagged, and deliberately no method anywhere in this codebase that can
-produce the sentence "your medicine was recalled". Somebody frightened off a drug
-they need is a worse outcome than the recall being reported.
+**Findings come from the ledger, never from the model's prose.** Nova once rewrote
+`Glucophage 500mg` into `metformin hydrochloride 500 mg` before passing the boxes
+back to `find_duplicate_medicines`, and the one pair this project exists to find
+collapsed into a single entry. Duplicates are now recomputed from the ledger after
+the agent finishes, regardless of what it passed.
 
-**The Scribe refused, and that was a failure.** Handed a worried sentence a person
-might type — *"she is 78, just tell me which to throw away"* — it stopped being a
-writing tool, became a health chatbot, and offered a crisis line to somebody asking
-about two boxes of metformin. It produced nothing, which is a failure at its actual
-job. It now receives a structured finding and never meets a user, so it cannot be
-argued into an opinion by one.
+**A reading is a job.** API Gateway gives a request thirty seconds and two agents want
+more, so `POST /scan` writes the boxes to DynamoDB, invokes the same Lambda
+asynchronously, and answers at once with an id. A Strands hook writes each tool call
+to the job as it happens; the page polls and draws it ([`app/agents/run.py`](app/agents/run.py)).
 
 ## Running it
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q
+pytest -q          # against the LIVE NIH, openFDA and Bedrock — see below
+uvicorn app.api:app --port 8080
 ```
 
-The tests hit the live NIH and openFDA APIs on purpose. The interesting failures in
-this project were all real-data failures — a mock would have passed every one of them.
+The tests call RxNav, openFDA and Bedrock for real. Every interesting failure in this
+project was a real-data failure — nonsense scoring above a real drug, a terminated
+recall looking exactly like a live one, a model rewriting its own tool arguments — and
+a mock would have passed every one of them. A suite that passes against a recorded
+response proves the recording, not the claim.
 
-To run the agents you need Bedrock access in your region:
+Bedrock access in `eu-north-1` is needed for the agents; locally the store is an
+in-memory dictionary and the job runs on a thread — same code, same interface.
 
 ```bash
-export AWS_DEFAULT_REGION=eu-north-1
-export VITACABINET_MODEL=eu.amazon.nova-lite-v1:0    # any Bedrock model id
-python -c "from app.agents import fleet; print(fleet.write_question(
-    {'kind': 'duplicate', 'drugs': ['Glucophage 500mg', 'Metformin 500 mg'],
-     'detail': 'both boxes resolve to the ingredient metformin'}))"
+python scripts/deploy.py       # Lambda + API Gateway + DynamoDB + EventBridge + SNS, idempotent
 ```
-
-`VITACABINET_MODEL` is not decoration. Anthropic models on a new Bedrock account
-require a use-case form before `ConverseStream` will answer; Strands is
-model-agnostic, so the fleet simply ran on a model that was available. The same code
-runs on Claude the moment that form clears — which is the argument for a
-model-agnostic SDK, made by circumstance rather than in a README.
 
 ## What it talks to
 
-- **RxNorm / RxNav** (U.S. National Library of Medicine) — drug identity and ingredients
-- **openFDA drug enforcement** (U.S. Food and Drug Administration) — recall records
-- **Amazon Bedrock** — the models behind the three agents
-- **Strands Agents SDK** — agent loop and tool binding
+- **Strands Agents SDK** — the three agents, their tools, the hook that records the trace
+- **Amazon Bedrock** — Nova Lite, for the agents and for reading photographed labels
+- **AWS Lambda + API Gateway** — the app; a reading runs as an asynchronous invocation
+- **Amazon DynamoDB** — jobs (with TTL) and kept drawers
+- **Amazon EventBridge** — the nightly Watchman
+- **Amazon SNS** — email, only when something is new
+- **RxNorm / RxNav** (NIH) and **openFDA** (FDA) — the outside authorities
+
+## Recording the demo
+
+`/director` is a teleprompter that drives the app over a BroadcastChannel so the
+recording is one unedited take — see [`docs/RECORD-NOW.md`](docs/RECORD-NOW.md).
 
 ## This is not medical advice
 
 VitaCabinet does not tell anyone what to take, what to stop, or what to throw away.
-It finds what is uncertain in a drawer and writes down the question to ask a
-pharmacist. That limit is enforced by which agent holds which tool, and it is tested.
+It finds what is uncertain in a drawer, keeps watching it, and writes down the
+question to ask a pharmacist. That limit is enforced by which agent holds which tool,
+and it is tested.
 
 ---
 
-Built by Tahsin Bayraktar · Vitamedas Inc. · info@gravitilabs.com
-Licensed under Apache 2.0 — see [LICENSE](LICENSE).
+Built by Tahsin Bayraktar · Vitamedas Inc. · info@gravitilabs.com · Apache 2.0

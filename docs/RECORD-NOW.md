@@ -3,7 +3,7 @@
 You read out loud. The app drives itself. You never touch the keyboard except
 the space bar.
 
-Total take: **4 minutes 15 seconds.** The limit is 5 minutes.
+Total take: **about 4 minutes 40 seconds.** The limit is 5 minutes.
 
 ---
 
@@ -65,14 +65,23 @@ beats four takes.
 
 ---
 
-## The two beats where the app is thinking
+## The beats where the app is thinking
 
-Two lines wait for real network calls, and the director will not move on until
-the screen has caught up with your voice:
+These lines wait for real work, and the director will not move on until the
+screen has caught up with your voice:
 
-- **"Read the drawer…"** — about five seconds while it calls the NIH and the FDA.
-  Keep talking; the line is written long enough to cover it.
-- **"…I ask it to write the question."** — about three seconds on Bedrock.
+- **"…I photograph the drawer."** — Nova Lite reads the six labels, about 3 seconds.
+- **"…read the drawer. Now watch the agents work."** — the two agents run their
+  tool calls, about 30–40 seconds on a cold Lambda. The trace streams while you
+  talk; the next two lines are written to cover it.
+- **"…I ask it to write the question."** — about 3 seconds.
+- **"Now I keep the drawer."** — instant.
+- **"…Here it is, running now."** — the Watchman runs again, another 30 seconds,
+  and then the watch line shows **0 new**. Keep talking.
+
+**Before you record:** open your inbox and click the AWS SNS confirmation link
+(subject "AWS Notification - Subscription Confirmation") if you want the email
+beat to be true for your own address. The demo does not depend on it.
 
 The director shows `waiting for the app…` while this happens. That is normal.
 

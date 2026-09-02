@@ -296,7 +296,9 @@ const ACTIONS = {
     const f = new File([blob], 'drawer.jpg', {type:'image/jpeg'});
     ring($('drop')); await readPhotos([f]);
   },
-  async scan() { await scan(drawer?.id); },
+  async scan(a) {            // the photo gave six real boxes; the script adds the one that is not a medicine
+    if (a?.add && !lines().includes(a.add)) $('boxes').value = lines().concat([a.add]).join('\n');
+    await scan(drawer?.id); },
   focus(a) { const k = a?.kind;
     if (k === 'counts') return ring($('counts')); if (k === 'trace') return ring($('trace')); if (k === 'unreadable') return ring($('note'));
     if (k === 'decay') return ring($('arch')); if (k === 'facts') return ring($('facts')); if (k === 'watch') return ring($('watch'));
@@ -304,7 +306,10 @@ const ACTIONS = {
   async question(a) { const i = (lastScan?.findings || []).findIndex(f => f.kind === (a?.kind || 'duplicate')); if (i < 0) return;
     ring(document.querySelector(`#q${i}`)?.closest('.finding')); const b = document.querySelector(`.finding button[data-i="${i}"]`); if (b) await writeQuestion(lastScan.findings[i], i, b); },
   async save() { await saveDrawer(); ring($('cabinet')); },
-  async confirm(a) { if (!drawer) return; showCabinet(await post(`/drawers/${drawer.id}/confirm`, { subject: a?.subject || drawer.boxes[0] })); ring($('facts')); },
+  async confirm(a) { if (!drawer) return;          // 'Norvasc' matches 'Norvasc 5 mg' however the label was read
+    const want = (a?.subject || drawer.boxes[0]).toLowerCase();
+    const subject = drawer.boxes.find(b => b.toLowerCase().startsWith(want)) || drawer.boxes[0];
+    showCabinet(await post(`/drawers/${drawer.id}/confirm`, { subject })); ring($('facts')); },
   async check() { if (!drawer) return; ring($('watch')); await scan(drawer.id); showCabinet(await (await fetch('/drawers/' + drawer.id)).json()); ring($('watch')); },
   architecture() { $('arch').classList.add('on'); ring($('arch')); },
   closing() { $('closing').classList.add('on'); ring($('closing')); },

@@ -66,13 +66,13 @@ const SCRIPT = [
 
   { say: "I add one line that is not a medicine at all, and read the drawer. Now watch the agents work.",
     cue: "SCREEN: the trace starts streaming. Point at it.",
-    act: { action: 'scan' }, until: 'scan', ceiling: 90, floor: 12 },
+    act: { action: 'scan', args: { add: 'shopping list milk' } }, until: 'scan', ceiling: 90, floor: 12 },
 
   { say: "This is the Identifier, on the Strands Agents SDK, calling its tools: one call per box to RxNorm at the NIH, then one to compare them all. Every call you see is real and timed.",
     cue: "SCREEN: the Identifier's rows. Keep talking; it is still running.",
     act: { action: 'focus', args: { kind: 'trace' } }, floor: 9 },
 
-  { say: "Then the Watchman takes over — one call per ingredient to the FDA enforcement record. Two agents, seven tool calls, about fifteen seconds.",
+  { say: "Then the Watchman takes over — one call per ingredient to the FDA enforcement record. Two agents, thirteen tool calls, about half a minute.",
     cue: "SCREEN: Watchman rows and the count chips.",
     act: { action: 'focus', args: { kind: 'counts' } }, floor: 8 },
 
@@ -101,7 +101,7 @@ const SCRIPT = [
 
   { say: "When Mum confirms she is actually taking one, the fact moves to her and resets. Confidence is stored, not assumed.",
     cue: "SCREEN: one bar refills, source changes to 'the person themselves'.",
-    act: { action: 'confirm', args: { subject: 'Norvasc 5mg' } }, floor: 7 },
+    act: { action: 'confirm', args: { subject: 'Norvasc' } }, floor: 7 },
 
   { say: "And the Watchman keeps watching. EventBridge runs it nightly over every kept drawer, and it emails only when something is new — a message every night is how people stop reading the one that matters. Here it is, running now.",
     cue: "SCREEN: 'Run the Watchman now' — trace streams again, then the watch line updates.",

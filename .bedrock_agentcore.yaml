@@ -1,0 +1,62 @@
+default_agent: vitacabinet
+agents:
+  vitacabinet:
+    name: vitacabinet
+    language: python
+    node_version: '20'
+    entrypoint: /Users/bayraktar/Documents/New Apps/Hackhaton/vitacabinet/agentcore_entry.py
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: none
+    source_path: /Users/bayraktar/Documents/New Apps/Hackhaton/vitacabinet
+    aws:
+      execution_role: arn:aws:iam::418748711761:role/AmazonBedrockAgentCoreSDKRuntime-eu-north-1-b865194938
+      execution_role_auto_create: false
+      account: '418748711761'
+      region: eu-north-1
+      ecr_repository: 418748711761.dkr.ecr.eu-north-1.amazonaws.com/bedrock-agentcore-vitacabinet
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: false
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: vitacabinet-9hqjzY4XYl
+      agent_arn: arn:aws:bedrock-agentcore:eu-north-1:418748711761:runtime/vitacabinet-9hqjzY4XYl
+      agent_session_id: null
+    codebuild:
+      project_name: bedrock-agentcore-vitacabinet-builder
+      execution_role: arn:aws:iam::418748711761:role/AmazonBedrockAgentCoreSDKCodeBuild-eu-north-1-b865194938
+      source_bucket: bedrock-agentcore-codebuild-sources-418748711761-eu-north-1
+    memory:
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
