@@ -213,6 +213,6 @@ VitaCabinet does not tell anyone what to take, what to stop, or what to throw aw
 
 Try it: **https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com**
 
-Code, with the Apache 2.0 licence and all 38 tests: **https://github.com/bayraktartahsin/vitacabinet**
+Code, with the Apache 2.0 licence and all 44 tests: **https://github.com/bayraktartahsin/vitacabinet**
 
 Built for the Agents for Humans hackathon with the Strands Agents SDK on Amazon Bedrock.
