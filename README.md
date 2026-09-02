@@ -151,6 +151,12 @@ python scripts/deploy.py       # Lambda + API Gateway + DynamoDB + EventBridge +
 `/director` is a teleprompter that drives the app over a BroadcastChannel so the
 recording is one unedited take — see [`docs/RECORD-NOW.md`](docs/RECORD-NOW.md).
 
+## The build journey, on builder.aws
+
+- [I gave one of my agents no tools at all](https://builder.aws.com/content/3IgYR6LSK8Egmfr1jFBDELaleu3/agents-for-humans-i-gave-one-of-my-agents-no-tools-at-all)
+- [The model orchestrates, the data never passes through it](https://builder.aws.com/content/3ImUOrZqGJiKgBTZHzHFlAR6H0M/agents-for-humans-the-model-orchestrates-the-data-never-passes-through-it)
+- [A medical record that admits what it does not know](https://builder.aws.com/content/3ImVQlXXdImOk9KJCErIpgwbgw9/agents-for-humans-a-medical-record-that-admits-what-it-does-not-know)
+
 ## This is not medical advice
 
 VitaCabinet does not tell anyone what to take, what to stop, or what to throw away.

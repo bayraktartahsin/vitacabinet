@@ -51,6 +51,12 @@ An agent that can look up whether a drug is dangerous will eventually write that
 
 **A leak that only showed in one test order.** The ledger was a ContextVar; Strands' concurrent tool executor runs tools on pool threads; a pool thread that once made its own ledger kept it. A locked module global is less elegant and correct.
 
+## Build journey, on builder.aws
+
+1. [I gave one of my agents no tools at all](https://builder.aws.com/content/3IgYR6LSK8Egmfr1jFBDELaleu3/agents-for-humans-i-gave-one-of-my-agents-no-tools-at-all)
+2. [The model orchestrates, the data never passes through it](https://builder.aws.com/content/3ImUOrZqGJiKgBTZHzHFlAR6H0M/agents-for-humans-the-model-orchestrates-the-data-never-passes-through-it)
+3. [A medical record that admits what it does not know](https://builder.aws.com/content/3ImVQlXXdImOk9KJCErIpgwbgw9/agents-for-humans-a-medical-record-that-admits-what-it-does-not-know)
+
 ## What's next
 
 The queue is what generalises. A drawer is one source; a discharge summary, a pharmacy record and a person's memory are three more, and they disagree constantly. A record that carries its own confidence is the only kind that can hold four disagreeing sources without pretending one of them is the truth.

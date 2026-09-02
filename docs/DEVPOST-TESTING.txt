@@ -1,3 +1,8 @@
+BONUS BLOG POSTS (builder.aws, three of them — the form field holds one URL):
+  https://builder.aws.com/content/3IgYR6LSK8Egmfr1jFBDELaleu3/agents-for-humans-i-gave-one-of-my-agents-no-tools-at-all
+  https://builder.aws.com/content/3ImUOrZqGJiKgBTZHzHFlAR6H0M/agents-for-humans-the-model-orchestrates-the-data-never-passes-through-it
+  https://builder.aws.com/content/3ImVQlXXdImOk9KJCErIpgwbgw9/agents-for-humans-a-medical-record-that-admits-what-it-does-not-know
+
 LIVE — nothing to install, no sign-up:
   https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com
 
