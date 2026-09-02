@@ -75,3 +75,16 @@ def test_health_says_where_the_agents_run(monkeypatch):
     assert c.get("/health").json()["agents_on"] == "local"
     monkeypatch.setattr(api, "AGENTCORE_ARN", "arn:x")
     assert c.get("/health").json()["agents_on"] == "bedrock-agentcore"
+
+
+def test_the_scribe_runs_on_the_runtime_with_the_other_two(monkeypatch):
+    """One fleet, one host. When a runtime is configured the question goes
+    there too, so no agent runs in a different place from its siblings."""
+    from fastapi.testclient import TestClient
+    fake = _FakeRuntime({"question": "Am I supposed to be taking both?"})
+    import boto3
+    monkeypatch.setattr(api, "AGENTCORE_ARN", "arn:aws:bedrock-agentcore:eu-north-1:1:runtime/x")
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: fake)
+    r = TestClient(api.app).post("/question", json={"kind": "duplicate", "drugs": ["a", "b"], "detail": "x"}).json()
+    assert r["ok"] and r["ran_on"] == "bedrock-agentcore"
+    assert json.loads(fake.calls[0]["payload"])["action"] == "question"

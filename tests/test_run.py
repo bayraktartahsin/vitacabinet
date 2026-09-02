@@ -70,3 +70,19 @@ def test_each_agent_reports_in_plain_words_without_showing_its_working(reading):
 def test_every_finding_carries_a_key_so_tomorrow_can_tell_what_is_new(reading):
     result, _, _ = reading
     assert all(f.get("key") for f in result["findings"])
+
+
+def test_the_identifier_also_reports_as_a_typed_object_that_matches_the_ledger(reading):
+    """Structured output: the agent's own account, as data. The ledger is the
+    check on it — a report that disagrees with what the tools found is a
+    report worth knowing about."""
+    result, _, _ = reading
+    report = result["report"]
+    assert "error" not in report, report
+    assert report["boxes_read"] >= 3
+    assert "shopping list milk" in report["unreadable"]
+    pairs = {frozenset(p) for p in report["duplicate_pairs"]}
+    assert frozenset({"Glucophage 500mg", "Metformin 500 mg"}) in pairs
+    assert report["one_line"] and "?" not in report["one_line"][:1]
+    for advice in ("stop taking", "throw away", "you should"):
+        assert advice not in report["one_line"].lower()

@@ -68,6 +68,20 @@ def read_on_agentcore(boxes: list[str], jid: str) -> dict:
     return result
 
 
+def ask_on_agentcore(finding: dict) -> str:
+    """The Scribe, on the runtime with the other two. One fleet, one host."""
+    import json
+    import uuid
+    import boto3
+    r = boto3.client("bedrock-agentcore").invoke_agent_runtime(
+        agentRuntimeArn=AGENTCORE_ARN,
+        runtimeSessionId=f"vitacabinet-q-{uuid.uuid4().hex}"[:64].ljust(33, "x"),
+        contentType="application/json", accept="application/json",
+        payload=json.dumps({"action": "question", "finding": finding}).encode())
+    body = r["response"].read() if hasattr(r.get("response"), "read") else r.get("response", b"")
+    return json.loads(body or b"{}").get("question", "")
+
+
 def run_job(jid: str) -> None:
     """The background half of a scan. Called by a second Lambda invocation in
     the cloud and by a thread locally; identical either way. The agents run on
@@ -262,9 +276,13 @@ def question(finding: Finding) -> dict:
     The Scribe is only ever handed a finding, never a person's own words: this
     signature is that rule expressed as a type.
     """
-    from .agents import fleet
     try:
-        return {"ok": True, "question": fleet.write_question(finding.model_dump())}
+        if AGENTCORE_ARN:
+            q = ask_on_agentcore(finding.model_dump())
+        else:
+            from .agents import fleet
+            q = fleet.write_question(finding.model_dump())
+        return {"ok": bool(q), "question": q, "ran_on": "bedrock-agentcore" if AGENTCORE_ARN else "local"}
     except Exception as e:                                   # noqa: BLE001
         log.warning("scribe unavailable: %s", e)
         return {"ok": False, "why": "the writing model is unavailable", "question": ""}

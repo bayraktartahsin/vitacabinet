@@ -47,7 +47,7 @@
   .thinking i{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:blink 1s infinite}
   @keyframes blink{50%{opacity:.2}}
   .summary{margin-top:12px;padding:12px 14px;border-left:3px solid var(--line);color:var(--muted);font-size:14px}
-  .summary b{color:var(--ink)}
+  .summary b{color:var(--ink)} .summary code{font:12px ui-monospace,Menlo,monospace;background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
 
   .finding{border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:16px 18px;margin-bottom:12px;background:var(--card)}
   .finding.high{border-left-color:var(--high);background:var(--high-bg)}
@@ -191,7 +191,7 @@ async function scan(drawerId) {
       const last = j.trace[j.trace.length - 1];
       const th = document.querySelector('.thinking');
       if (th && last) th.lastChild.textContent = last.agent === 'Watchman' ? 'Watchman is checking the FDA record…' : 'Identifier is reading the boxes…';
-      if (j.status === 'done') { document.querySelector('.thinking')?.remove(); drawSaid(j.said); render(j.result); finish(); resolve(j.result); }
+      if (j.status === 'done') { document.querySelector('.thinking')?.remove(); drawSaid(j.said, j.result.report); render(j.result); finish(); resolve(j.result); }
       else if (j.status === 'failed') { $('trace').innerHTML += `<p class="empty">The agents could not finish: ${esc(j.error)}</p>`; finish(); resolve(null); }
       else pollTimer = setTimeout(tick, 600);
     };
@@ -210,8 +210,11 @@ function drawStep(s) {
     <div class="said">${esc(s.said)}</div></div>`;
   th ? $('trace').insertBefore(el, th) : $('trace').appendChild(el);
 }
-function drawSaid(said) {
-  for (const [who, text] of Object.entries(said || {})) if (text)
+function drawSaid(said, report) {
+  if (report && !report.error)
+    $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="Identifier">Identifier's typed report</b>
+      <code>DrawerReport</code> · boxes_read <b>${report.boxes_read}</b> · duplicate_pairs <b>${(report.duplicate_pairs||[]).length}</b> · unreadable <b>${(report.unreadable||[]).length}</b><br>${esc(report.one_line || '')}</div>`);
+  for (const [who, text] of Object.entries(said || {})) if (text && !(who === 'Identifier' && report && !report.error))
     $('trace').insertAdjacentHTML('beforeend', `<div class="summary"><b class="${esc(who)}">${esc(who)} reports:</b> ${esc(text.slice(0, 420))}</div>`);
 }
 

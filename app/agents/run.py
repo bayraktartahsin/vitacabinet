@@ -17,6 +17,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from pydantic import BaseModel, Field
 from strands import Agent
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 from strands.models import BedrockModel
@@ -62,6 +63,23 @@ class Trace(HookProvider):
             self.on_step(step)
 
 
+class DrawerReport(BaseModel):
+    """What the Identifier concluded, as data rather than prose.
+
+    The ledger is still the truth about *what was found*; this is the agent's
+    own account of it, typed so the page can render it and a test can check
+    it against the ledger. A model that has to fill in fields cannot bury an
+    unreadable box in a paragraph.
+    """
+
+    boxes_read: int = Field(description="how many boxes were identified")
+    unreadable: list[str] = Field(default_factory=list,
+                                  description="box texts that could not be confirmed as a medicine")
+    duplicate_pairs: list[list[str]] = Field(default_factory=list,
+                                             description="pairs of box texts that share an active ingredient")
+    one_line: str = Field(description="one plain sentence for the person, no advice")
+
+
 def _model() -> BedrockModel:
     # Larger output budget than the Scribe's: these two narrate a whole drawer.
     return BedrockModel(model_id=fleet.DEFAULT_MODEL, region_name=fleet.REGION,
@@ -99,6 +117,17 @@ def _read_drawer(boxes: list[str], on_step: StepFn | None, say) -> dict:
         f"then call find_duplicate_medicines once with all of them, then report.")))
     if say:
         say("Identifier", ident_said)
+
+    # The same agent, asked for its conclusion as a typed object. This is a
+    # second, cheap model call over the conversation it already had; the
+    # schema is the contract, and the ledger is the check on it.
+    try:
+        report = identifier.structured_output(
+            DrawerReport,
+            "Report what you found as the requested structure. Do not give advice.")
+        report_json = report.model_dump()
+    except Exception as e:                                       # noqa: BLE001
+        report_json = {"error": f"{type(e).__name__}: {e}"[:160]}
 
     # Anything the model skipped is read directly, and the trace says so. The
     # drawer is the truth; the model is how it is read, not a gate on it.
@@ -140,6 +169,7 @@ def _read_drawer(boxes: list[str], on_step: StepFn | None, say) -> dict:
         "findings": assemble_findings(led),
         "trace": ident_trace.steps + watch_trace.steps,
         "agents_said": {"Identifier": ident_said, "Watchman": watch_said},
+        "report": report_json,
         "seconds": round(time.time() - t0, 1),
     }
 
