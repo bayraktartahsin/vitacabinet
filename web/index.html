@@ -134,13 +134,14 @@
   /* ── the cabinet ───────────────────────────────────────── */
   #cabinet,#arch,#closing{display:none} #cabinet.on,#arch.on,#closing.on{display:block}
   .cabsum{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-  .fact{display:grid;grid-template-columns:1fr 110px auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);animation:in .3s ease-out}
+  .fact{display:grid;grid-template-columns:1fr auto;grid-template-areas:"s c" "b b" "w w";gap:6px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);animation:in .3s ease-out}
   .fact:last-child{border-bottom:0}
-  .fact .s{font-weight:650;font-size:15px} .fact .w{font-size:12.5px;color:var(--muted);margin-top:2px}
-  .bar{height:9px;background:var(--line);border-radius:5px;overflow:hidden}
+  .fact .s{grid-area:s;font-weight:650;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .fact .c{grid-area:c} .fact .w{grid-area:w;font-size:12.5px;color:var(--muted)}
+  .pill{font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--med);background:var(--med-bg);border:1px solid #e8d3ad;border-radius:999px;padding:2px 8px}
+  .bar{grid-area:b;height:9px;background:var(--line);border-radius:5px;overflow:hidden}
   .bar i{display:block;height:100%;background:var(--ok);border-radius:5px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
   .fact.stale .bar i{background:var(--med)}
-  .fact.stale .s::after{content:"  worth asking about";font-weight:500;color:var(--med);font-size:12.5px}
   .watch{display:grid;gap:8px;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--paper);border:1px solid var(--line);font-size:13.5px;color:var(--muted)}
   .watch b{color:var(--ink)} .watch .zero{color:var(--ok);font-weight:650}
   .hist{display:flex;gap:4px;align-items:flex-end;height:18px} .hist i{width:8px;border-radius:2px;background:var(--line2)} .hist i.new{background:var(--high)}
@@ -351,17 +352,24 @@ function render(data) {
   const c = [['boxes read', data.drugs.length], ['duplicate', kinds('duplicate'), 'alert'], ['live recalls', kinds('recall')],
              ['ingredients checked', data.ingredients_checked.length], ['unreadable', data.unreadable.length], ['tool calls', data.trace.length], ['seconds', data.seconds]];
   $('counts').innerHTML = c.map(([k, v, cls]) => `<span class="count ${cls && v ? cls : ''}"><b>${v}</b> ${k}</span>`).join('');
-  $('out').innerHTML = data.findings.length ? data.findings.map((f, i) => `
+  $('out').innerHTML = data.findings.length ? cards(data.findings, newKeys)
+    : '<div class="empty big"><div class="ico">✅</div>Nothing in this drawer is worth a question today.</div>';
+  wireQuestions(data.findings);
+  $('note').innerHTML = data.unreadable.length ? 'Not identified, and deliberately left that way: ' + data.unreadable.map(u => `<span class="unreadable">${esc(u)}</span>`).join(' ') + ' — a wrong name here would become a recall alert for a drug nobody takes.' : '';
+  $('p-findings').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function cards(findings, newKeys) {
+  return findings.map((f, i) => `
     <article class="finding ${esc(f.severity)}">
       <div class="top"><span class="tag">${esc(f.kind)}</span>${newKeys.has(f.key) ? '<span class="new">new since last check</span>' : ''}</div>
       <h3>${esc(f.headline)}</h3><p>${esc(f.detail)}</p>
       ${f.lots ? `<div class="lots">Check the box for: ${esc(f.lots)}</div>` : ''}
       <div class="acts"><button class="btn btn-ghost" data-i="${i}">✎ Write the question to ask</button></div>
-      <div class="question" id="q${i}" hidden></div></article>`).join('')
-    : '<div class="empty big"><div class="ico">✅</div>Nothing in this drawer is worth a question today.</div>';
-  document.querySelectorAll('.finding .acts button').forEach(b => b.onclick = () => writeQuestion(data.findings[+b.dataset.i], +b.dataset.i, b));
-  $('note').innerHTML = data.unreadable.length ? 'Not identified, and deliberately left that way: ' + data.unreadable.map(u => `<span class="unreadable">${esc(u)}</span>`).join(' ') + ' — a wrong name here would become a recall alert for a drug nobody takes.' : '';
-  $('p-findings').scrollIntoView({behavior:'smooth', block:'start'});
+      <div class="question" id="q${i}" hidden></div></article>`).join('');
+}
+function wireQuestions(findings) {
+  document.querySelectorAll('.finding .acts button').forEach(b => b.onclick = () => writeQuestion(findings[+b.dataset.i], +b.dataset.i, b));
 }
 
 async function writeQuestion(finding, i, btn) {
@@ -394,9 +402,19 @@ function showCabinet(d) {
   const conf = d.facts.filter(f => !f.stale).length;
   $('cabsum').innerHTML = `<span class="chip"><b>${d.facts.length}</b> facts</span><span class="chip"><span class="dot"></span><b>${conf}</b> confident</span><span class="chip"><b>${d.stale_count}</b> worth asking</span>`;
   $('facts').innerHTML = d.facts.map(f => `<div class="fact ${f.stale ? 'stale' : ''}">
-    <div><div class="s">${esc(f.subject)}</div><div class="w">${esc(f.why)}</div></div>
+    <div class="s">${esc(f.subject)}${f.stale ? '<span class="pill">worth asking</span>' : ''}</div>
+    <button class="btn btn-ghost btn-tiny c" data-s="${esc(f.subject)}">Confirm</button>
     <div class="bar" title="${Math.round(f.confidence*100)}% believed"><i style="width:${Math.round(f.confidence * 100)}%"></i></div>
-    <button class="btn btn-ghost btn-tiny" data-s="${esc(f.subject)}">Confirm</button></div>`).join('');
+    <div class="w">${esc(f.why)}</div></div>`).join('');
+  // Arriving at a kept drawer: show what the Watchman found last time, so the
+  // page is never empty for somebody following a link.
+  if (!lastScan && d.findings?.length) {
+    const newKeys = new Set((d.last_new || []).map(f => f.key));
+    $('out').innerHTML = cards(d.findings, newKeys);
+    wireQuestions(d.findings);
+    $('trace').innerHTML = `<div class="empty big"><div class="ico">🌙</div>Last read by the Watchman ${d.last_checked ? new Date(d.last_checked*1000).toLocaleString() : ''}. Press <b>Run the Watchman now</b> to watch the agents read it live.</div>`;
+    setStep(4);
+  }
   document.querySelectorAll('#facts button').forEach(b => b.onclick = async () => showCabinet(await post(`/drawers/${d.id}/confirm`, { subject: b.dataset.s })));
   const when = d.last_checked ? new Date(d.last_checked * 1000).toLocaleString() : 'never';
   const last = (d.history || []).slice(-1)[0];
@@ -439,8 +457,8 @@ const ACTIONS = {
     if (k === 'counts') return ring($('counts')); if (k === 'trace') return ring($('trace')); if (k === 'unreadable') return ring($('note'));
     if (k === 'decay') return ring($('arch')); if (k === 'facts') return ring($('facts')); if (k === 'watch') return ring($('watch'));
     ring([...document.querySelectorAll('.finding')].find(f => f.querySelector('.tag')?.textContent.trim() === k)); },
-  async question(a) { const i = (lastScan?.findings || []).findIndex(f => f.kind === (a?.kind || 'duplicate')); if (i < 0) return;
-    ring(document.querySelector(`#q${i}`)?.closest('.finding')); const b = document.querySelector(`.finding .acts button[data-i="${i}"]`); if (b) await writeQuestion(lastScan.findings[i], i, b); },
+  async question(a) { const list = lastScan?.findings || drawer?.findings || []; const i = list.findIndex(f => f.kind === (a?.kind || 'duplicate')); if (i < 0) return;
+    ring(document.querySelector(`#q${i}`)?.closest('.finding')); const b = document.querySelector(`.finding .acts button[data-i="${i}"]`); if (b) await writeQuestion(list[i], i, b); },
   async save() { await saveDrawer(); ring($('cabinet')); },
   async confirm(a) { if (!drawer) return;
     const want = (a?.subject || drawer.boxes[0]).toLowerCase();
