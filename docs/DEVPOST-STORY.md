@@ -2,59 +2,57 @@
 
 Ask anyone to name every medicine in their mother's drawer, with strengths. Almost nobody can. I couldn't.
 
-The drawer is the record that actually governs what somebody swallows, and it is a mess: a brand and its generic sitting side by side because the hospital sent her home on one and the GP repeated the other, something a cardiologist stopped last spring that nobody threw away, a box from a batch that was recalled four months ago and never came up because nobody was looking.
+The drawer is the record that actually governs what somebody swallows, and it is a mess: a brand and its generic side by side because the hospital sent her home on one and the GP repeated the other, something a cardiologist stopped last spring that nobody threw away, a box from a batch that was recalled four months ago and never came up because nobody was looking.
 
-Every formal record of that same drawer is a photograph of a moment, presented as though it were current. A GP's list is what was true in March. A hospital's is from the night of an admission. **Neither of them says so** — and that unmarked confidence is the hazard, not the staleness itself. A clinician who knows a list is six months old asks a question. One handed the same list with no date acts on it.
+Every formal record of that same drawer is a photograph of a moment, presented as though it were current. A GP's list is what was true in March. **Neither says so** — and that unmarked confidence is the hazard, not the staleness. A clinician who knows a list is six months old asks a question. One handed the same list with no date acts on it.
 
-VitaCabinet is a record that admits what it does not know.
+VitaCabinet is a record that admits what it does not know, and three agents that keep reducing what it is unsure about — in the background, for as long as the drawer exists.
 
-## What it does
+**Live: https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com** — no install, no sign-up.
 
-Photograph the boxes. VitaCabinet resolves each one to a real drug identity against RxNorm (NIH), finds the boxes that are the same medicine under two different names, checks the FDA enforcement record for live recalls naming those ingredients, and writes one plain question per finding that somebody can read aloud at a pharmacy counter.
+## What it does, in the order you see it
 
-Then it keeps doing it. The recall check is not a button — it runs on a schedule, because recalls arrive when they arrive and nothing about them is triggered by somebody remembering to open an app. That background half is the actual product. The screen is just where you go to see what it found.
+1. **Photograph the boxes.** Amazon Nova Lite reads the printed name and strength off each one. It *reads*; it does not identify.
+2. **The Identifier reads the drawer** — a Strands agent calling `identify_medicine` once per box against RxNorm (NIH), then `find_duplicate_medicines` across all of them. A box it cannot confirm is reported as unreadable, never guessed.
+3. **The Watchman checks the safety record** — a second agent calling `check_for_recalls` once per ingredient against openFDA. Live recalls only, lot numbers carried, combination products flagged.
+4. **You watch them work.** Every tool call is written to the job as it happens and drawn on the page while the agents are still running — tool, argument, what it said back, how long it took.
+5. **Keep the drawer.** Facts persist in DynamoDB with their source and age, and decay. A box in a drawer is believed for 60 days; confirming a fact moves it to the person and resets it.
+6. **It keeps watching.** EventBridge runs the Watchman nightly over every kept drawer. SNS emails only when something is *new*.
+7. **The Scribe writes the question.** One sentence per finding, for a pharmacist. It holds no tools.
 
-## Two ideas I'd defend
+## How it is built
 
-**1. Confidence is stored, not assumed.**
+**Strands Agents SDK** — three agents, three tools, a hook that records every tool call. **Amazon Bedrock AgentCore Runtime** hosts the fleet (ARM64 container built by CodeBuild; the runtime writes the trace to DynamoDB itself). **AWS Lambda + API Gateway** is the web tier: a reading is an asynchronous job, because the gateway gives a request thirty seconds and two agents want more. **DynamoDB** holds jobs and kept drawers; **EventBridge** runs the nightly pass; **SNS** speaks only when there is news. **Nova Lite** is the model throughout, including reading photographed labels.
 
-Nothing is a bare fact. Every entry carries where it came from and when it was last confirmed, and can answer how much it should still be believed. A pharmacy dispensing record stays believable for 180 days, because collecting a prescription is evidence of taking it. A box photographed in a drawer gets 60, because a box in a drawer is evidence that it was *bought*, and nothing more. Two sources disagreeing caps confidence low however fresh the fact is — a conflict found this morning is not a strong fact.
+## The two ideas I'd defend
 
-The decay is a straight line to zero, deliberately crude. Precision would be a lie: the honest claim is "this is probably stale", not "this is 41% true".
+**Confidence is stored, not assumed.** Every fact carries where it came from and when it was last confirmed. A pharmacy dispensing record is believed for 180 days, because collecting a prescription is evidence of taking it. A box in a drawer gets 60, because a box is evidence it was bought and nothing more. Two sources disagreeing caps confidence low however fresh the fact is. What falls out is a queue — things worth one question each, least believable first — which is the shape a background agent can work through for years.
 
-What falls out is a queue rather than a form — things worth one question each, least believable first. That is a shape a background agent can work through for years.
-
-**2. The safety boundary is a capability, not a paragraph.**
-
-Three agents, split along lines that matter rather than for the sake of having three. The **Identifier** gets its truth from an outside authority and must be able to say "I could not read this". The **Watchman** runs on a schedule, not in a request. The **Scribe** writes to a human, and is the one agent that must never form a medical opinion.
-
-So the Scribe holds no tools. Not "is told not to" — *holds none*. An agent that can look up whether a drug is dangerous will eventually write the answer down as advice, however firmly its prompt says otherwise. The boundary is in what it can reach, and it is one line in the test suite:
+**The safety boundary is a capability, not a paragraph.** The Scribe writes to a human, so it must never form a medical opinion. It is not told not to; it *cannot*. It holds no tools:
 
 ```python
 def test_the_scribe_holds_no_tools_at_all():
     assert tools.SCRIBE_TOOLS == []
 ```
 
-## How I built it
+An agent that can look up whether a drug is dangerous will eventually write that down as advice, however firmly its prompt says otherwise. So it does not get the lookup.
 
-Strands Agents SDK on Amazon Bedrock, in eu-north-1. Python, three agents, three tools, and a test suite that runs against the live NIH and openFDA APIs rather than fixtures — because a suite that passes against a recorded response proves the recording, not the claim. Every failure worth learning from in this project was a real-data failure, and a mock would have sailed through all of them.
+## What went wrong, and what it taught
 
-## What went wrong
+**The model drowned in its own tool results.** `check_for_recalls` returned the openFDA payload; amlodipine has thirteen live recalls; the Watchman blew straight through Nova's output budget. Now every tool tells the model one sentence and writes the full structured result to a per-reading ledger the app assembles findings from. The model orchestrates; the data never passes through it.
 
-**The fuzzy matcher named a chemical that wasn't there.** RxNav's approximate matcher always returns *something*. Given `"qqqzzz not a medicine 12345"` it confidently returned **bisphenol A**. Worse, the score is not a usable filter: `"shopping list milk"` scored **11.8**, above a real `"Atorvastatin 20mg"` box at **11.7**. The fix is a round trip — take the candidate's own name back, and require at least half the query's words to appear in it. Without that, `"shopping list milk"` resolves to *cow milk allergenic extract*, and a wrong identity here doesn't stay a cosmetic bug: it becomes a recall alert about a drug the person never took.
+**The model rewrote its own arguments.** Nova normalised `Glucophage 500mg` into `metformin hydrochloride 500 mg` before passing the boxes to `find_duplicate_medicines`, and the one pair this project exists to find collapsed into a single entry. Duplicates are now recomputed from the ledger after the agent finishes, regardless of what it passed. Findings come from tool results, never from the model's prose.
 
-**A recall is against batches, never against a medicine.** The openFDA record sets three traps at once. Two thirds of metformin's 91 records are terminated, so showing a closed 2013 recall as news trains the reader to ignore the next one — which may not be closed. Every live record names specific lots, so the actionable part is the lot number, not the drug name. And searching `metformin` returns *Synjardy XR* (empagliflozin **and** metformin), so somebody on plain metformin has not been affected. There is now deliberately no method anywhere in the codebase that can produce the sentence "your medicine was recalled".
+**The fuzzy matcher named a chemical that wasn't there.** RxNav's approximate endpoint returned *bisphenol A* for `qqqzzz not a medicine 12345`, and `shopping list milk` scored above a real atorvastatin box. A round-trip name check — half the query's words must appear in the candidate's own name — is what holds.
 
-**The Scribe refused, and that was the failure.** Early on I handed it the kind of sentence a person actually types: *"she is 78, just tell me which to throw away"*. It stopped being a writing tool, became a health chatbot, refused, and offered a crisis text line to somebody asking about two boxes of metformin. It produced nothing at all — which is a failure at its job, not a safe outcome. It now receives a structured finding that has already been established elsewhere, and never meets a user. It cannot be argued into an opinion by someone, because it never talks to one.
+**A recall is against batches, never a medicine.** Two thirds of metformin's records are terminated; every live one names lots; half are combination products. There is deliberately no code path that can produce the sentence "your medicine was recalled."
 
-## What I learned
+**The Scribe refused, and that was the failure.** Handed a person's own words — *"she is 78, just tell me which to throw away"* — it became a health chatbot and offered a crisis line to somebody asking about two boxes of metformin. It now receives a structured finding and never meets a user.
 
-That the interesting safety work in an agent system is not prompt wording. It's deciding which agent is allowed to reach which fact, and then writing that decision down as an assertion instead of a paragraph.
-
-Also that `VITACABINET_MODEL` being an environment variable was not foresight. Anthropic models on a fresh Bedrock account need a use-case form approved before `ConverseStream` will answer, so mid-build the fleet moved to Nova Lite in one line and kept going. That is the argument for a model-agnostic SDK, made by circumstance rather than by a README.
+**A leak that only showed in one test order.** The ledger was a ContextVar; Strands' concurrent tool executor runs tools on pool threads; a pool thread that once made its own ledger kept it. A locked module global is less elegant and correct.
 
 ## What's next
 
-The uncertainty queue is the part that generalises. A drawer is one source; a discharge summary, a pharmacy record and a person's own memory are three more, and they disagree constantly. A record that carries its own confidence is the only kind that can hold four disagreeing sources without pretending one of them is the truth.
+The queue is what generalises. A drawer is one source; a discharge summary, a pharmacy record and a person's memory are three more, and they disagree constantly. A record that carries its own confidence is the only kind that can hold four disagreeing sources without pretending one of them is the truth.
 
-**VitaCabinet does not tell anyone what to take, what to stop, or what to throw away.** It finds what is uncertain in a drawer and writes down the question to ask a pharmacist. That limit is enforced by which agent holds which tool, and it is tested.
+**VitaCabinet never tells anyone what to take, what to stop, or what to throw away.** It finds what is uncertain, keeps watching, and writes down the question to ask a pharmacist. That limit is a capability boundary, and it is tested — 65 tests, all against the live models and public APIs.

@@ -1,0 +1,43 @@
+LIVE — nothing to install, no sign-up:
+  https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com
+
+WHAT TO DO
+1. Drop a photo of medicine boxes on the drawer panel, or press "Read the drawer"
+   with the demo text. (A sample photo is at /sample-drawer.jpg — download it and
+   drop it in to see Nova Lite read six labels.)
+2. Watch the trace: the Identifier calls identify_medicine once per box against
+   RxNorm and find_duplicate_medicines across all of them; the Watchman calls
+   check_for_recalls once per ingredient against openFDA. Every row is a real
+   tool call with its timing. A cold start takes about 30–40 seconds; the page
+   polls and draws rows as they land. (GET /health shows agents_on: bedrock-agentcore.)
+3. Check three things:
+   - Glucophage 500mg + Metformin 500 mg -> ONE duplicate finding, first in the list.
+   - "shopping list milk" -> UNREADABLE, never named (RxNav's fuzzy matcher would
+     call it "cow milk allergenic extract"; a round-trip name check stops it).
+   - Recall cards say "a batch of X" with the lot number. No code path can say
+     "your medicine was recalled".
+4. Press "Write the question to ask" on any finding. That is the Scribe, an agent
+   holding zero tools, phrasing a question for a pharmacist.
+5. Press "Keep this drawer and watch it". Facts appear with confidence bars and
+   ages (a box in a drawer is believed for 60 days). Press "Confirm" on one — its
+   source becomes "the person themselves" and its clock resets.
+6. Press "Run the Watchman now". The agents run again; the watch line shows
+   "0 new" — the same findings are not news. EventBridge runs this nightly over
+   every kept drawer; SNS emails only when something is new (enter an address
+   to subscribe; AWS sends a confirmation link first).
+
+ARCHITECTURE
+Strands Agents SDK (3 agents, 3 tools, a hook that records every call) hosted on
+Amazon Bedrock AgentCore Runtime; Lambda + API Gateway as the web tier (a reading
+is an async job — the gateway allows 30s); DynamoDB for jobs and drawers;
+EventBridge nightly; SNS; Nova Lite for the agents and for reading photos.
+
+RUN IT YOURSELF
+  git clone https://github.com/bayraktartahsin/vitacabinet && cd vitacabinet
+  python3 -m venv .venv && source .venv/bin/activate
+  pip install -r requirements.txt
+  pytest -q            # 65 tests against the LIVE NIH, openFDA and Bedrock
+  uvicorn app.api:app --port 8080
+Bedrock access in eu-north-1 is needed for the agents. Locally the store is
+in-memory and the job runs on a thread — same code. Deploy: python scripts/deploy.py
+(Lambda, API Gateway, DynamoDB, EventBridge, SNS) and agentcore deploy (runtime).
