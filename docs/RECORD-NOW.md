@@ -31,6 +31,16 @@ app window and it will pick it up again.
 
 **4. Start your screen recording.** Capture only the app window.
 
+> **Use the Mac's own recorder: press `⌘ ⇧ 5`.**
+>
+> Choose **Record Selected Portion**, drag the box around the app window, tick
+> **Options → Microphone → your mic**, then click **Record**. Stop from the menu
+> bar. The file lands on your Desktop as a `.mov` that is yours.
+>
+> Do not use Loom, or any recorder whose free plan will not give you the file.
+> Devpost only accepts **YouTube, Facebook Video, Vimeo or Youku** links — its
+> own field says so — so you need a file you can upload, not a share link.
+
 **5. Press the space bar.**
 
 ---
