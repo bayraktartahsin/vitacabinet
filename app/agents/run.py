@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from strands import Agent
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 from strands.models import BedrockModel
@@ -78,6 +78,14 @@ class DrawerReport(BaseModel):
     duplicate_pairs: list[list[str]] = Field(default_factory=list,
                                              description="pairs of box texts that share an active ingredient")
     one_line: str = Field(description="one plain sentence for the person, no advice")
+
+    @field_validator("unreadable", "duplicate_pairs", mode="before")
+    @classmethod
+    def _none_is_empty(cls, v):
+        """Nova writes `null` for an empty list when there is nothing to
+        report, and a report that fails validation because the drawer was
+        *fine* is a bad joke. None means none."""
+        return [] if v is None else v
 
 
 def _model() -> BedrockModel:

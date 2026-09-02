@@ -3,7 +3,7 @@
 **Photograph the medicine boxes in a drawer. Three agents read it, keep watching it,
 and write down the question to ask a pharmacist. It never tells anyone what to take.**
 
-**Live: https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com**
+**Live: https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com** · [a drawer the Watchman has already visited](https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com/?drawer=b2c20c522b)
 
 Built for the AWS *Agents for Humans* hackathon (Everyday Agents track) with the
 [Strands Agents SDK](https://strandsagents.com) on Amazon Bedrock.

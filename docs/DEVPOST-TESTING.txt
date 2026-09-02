@@ -1,6 +1,11 @@
 LIVE — nothing to install, no sign-up:
   https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com
 
+A DRAWER THE WATCHMAN HAS ALREADY VISITED (no waiting):
+  https://b5emjsgbi1.execute-api.eu-north-1.amazonaws.com/?drawer=b2c20c522b
+  Facts with ages and sources, one confirmed by the person, the watch line
+  with its history. "Run the Watchman now" re-reads it live.
+
 WHAT TO DO
 1. Drop a photo of medicine boxes on the drawer panel, or press "Read the drawer"
    with the demo text. (A sample photo is at /sample-drawer.jpg — download it and

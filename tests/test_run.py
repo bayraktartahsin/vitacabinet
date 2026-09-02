@@ -86,3 +86,12 @@ def test_the_identifier_also_reports_as_a_typed_object_that_matches_the_ledger(r
     assert report["one_line"] and "?" not in report["one_line"][:1]
     for advice in ("stop taking", "throw away", "you should"):
         assert advice not in report["one_line"].lower()
+
+
+def test_a_clean_drawer_report_survives_the_model_writing_null_for_nothing():
+    """Seen live: a drawer with nothing unreadable came back with
+    `unreadable: null`, and the typed report failed validation because the
+    drawer was fine. None means none."""
+    from app.agents.run import DrawerReport
+    r = DrawerReport(boxes_read=6, unreadable=None, duplicate_pairs=None, one_line="Six boxes, all read.")
+    assert r.unreadable == [] and r.duplicate_pairs == []
