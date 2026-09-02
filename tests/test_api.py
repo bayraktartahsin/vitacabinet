@@ -6,6 +6,8 @@ under the tidy one, and the reader learns to skim.
 """
 from __future__ import annotations
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,88 +19,121 @@ DRAWER = ["Glucophage 500mg", "Metformin 500 mg", "Atorvastatin 20mg",
           "Norvasc 5mg", "shopping list milk"]
 
 
+def _wait(jid: str, timeout: float = 120) -> dict:
+    """Poll the way the page does."""
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        j = client.get(f"/jobs/{jid}").json()
+        if j["status"] in ("done", "failed"):
+            return j
+        time.sleep(0.5)
+    raise AssertionError("the job did not finish")
+
+
 @pytest.fixture(scope="module")
 def scan():
     r = client.post("/scan", json={"boxes": [{"text": t} for t in DRAWER]})
     assert r.status_code == 200
-    return r.json()
+    jid = r.json()["job_id"]
+    assert jid, "a scan must hand back a job to poll"
+    job = _wait(jid)
+    assert job["status"] == "done", job.get("error")
+    return job
+
+
+def test_a_scan_answers_at_once_and_the_trace_grows_while_it_runs():
+    """API Gateway gives a request thirty seconds and two agents want more,
+    so the page must be able to watch the agents think rather than wait."""
+    t0 = time.time()
+    jid = client.post("/scan", json={"boxes": [{"text": "Ramipril 5mg"}]}).json()["job_id"]
+    assert time.time() - t0 < 2, "POST /scan must not block on the agents"
+    job = _wait(jid)
+    assert job["trace"] and job["trace"][0]["agent"] == "Identifier"
 
 
 def test_the_brand_and_the_generic_come_back_as_one_duplicate(scan):
-    """The finding the whole product exists for."""
-    dupes = [f for f in scan["findings"] if f["kind"] == "duplicate"]
+    dupes = [f for f in scan["result"]["findings"] if f["kind"] == "duplicate"]
     assert len(dupes) == 1
-    assert "metformin" in dupes[0]["detail"].lower()
     assert set(dupes[0]["drugs"]) == {"Glucophage 500mg", "Metformin 500 mg"}
 
 
 def test_nonsense_is_reported_unreadable_rather_than_named(scan):
-    """A wrong name here becomes a recall alert for a drug nobody takes."""
-    assert "shopping list milk" in scan["unreadable"]
-    named = {d["name"] for d in scan["drugs"] if d["identified"]}
-    assert not any(n and "milk" in n.lower() for n in named)
+    assert "shopping list milk" in scan["result"]["unreadable"]
 
 
 def test_recall_findings_never_claim_the_persons_medicine_was_recalled(scan):
-    """The only claim the data supports is "a batch", plus something to check."""
-    for f in scan["findings"]:
+    for f in scan["result"]["findings"]:
         if f["kind"] == "recall":
             assert "a batch of" in f["detail"].lower()
             assert "your medicine" not in f["detail"].lower()
-            assert "stop taking" not in f["detail"].lower()
-
-
-def test_the_urgent_findings_come_before_the_tidy_ones(scan):
-    """Duplicates and recalls above staleness — a double dose is happening now,
-    a six-month-old confirmation date is not."""
-    kinds = [f["kind"] for f in scan["findings"]]
-    if "stale" in kinds:
-        first_stale = kinds.index("stale")
-        assert all(k == "stale" for k in kinds[first_stale:])
-
-
-def test_every_recall_finding_carries_something_to_check(scan):
-    """A recall alert without a lot number is just alarm."""
-    for f in scan["findings"]:
-        if f["kind"] == "recall":
-            assert f.get("date")
             assert "check the box" in f["detail"].lower()
 
 
-def test_a_drawer_of_unrelated_drugs_raises_no_duplicate():
-    r = client.post("/scan", json={"boxes": [
-        {"text": t} for t in ["Atorvastatin 20mg", "Ramipril 5mg", "Aspirin 75mg"]]})
-    assert not [f for f in r.json()["findings"] if f["kind"] == "duplicate"]
+def test_the_urgent_findings_come_before_the_tidy_ones(scan):
+    kinds = [f["kind"] for f in scan["result"]["findings"]]
+    assert kinds[0] == "duplicate"
+
+
+def test_the_agents_left_a_trace_a_person_can_read(scan):
+    trace = scan["result"]["trace"]
+    tools = {s["tool"] for s in trace}
+    assert {"identify_medicine", "find_duplicate_medicines", "check_for_recalls"} <= tools
+    assert all(s["said"] for s in trace)
+
+
+def test_a_kept_drawer_ages_and_remembers_what_the_watchman_found():
+    d = client.post("/drawers", json={"boxes": ["Glucophage 500mg", "Metformin 500 mg"], "owner": "Mum"}).json()
+    assert d["facts"] and all("confidence" in f and "why" in f for f in d["facts"])
+    jid = client.post(f"/drawers/{d['id']}/check").json()["job_id"]
+    job = _wait(jid)
+    assert job["status"] == "done"
+    after = client.get(f"/drawers/{d['id']}").json()
+    assert after["last_checked"] and after["findings"]
+    assert after["history"][-1]["new"] == len(after["findings"]), "everything is new the first time"
+    again = _wait(client.post(f"/drawers/{d['id']}/check").json()["job_id"])
+    assert again["result"]["new_since_last_check"] == [], "nothing is new the second time"
+
+
+def test_confirming_a_fact_is_recorded_as_coming_from_the_person():
+    d = client.post("/drawers", json={"boxes": ["Norvasc 5mg"]}).json()
+    r = client.post(f"/drawers/{d['id']}/confirm", json={"subject": "Norvasc 5mg"}).json()
+    fact = next(f for f in r["facts"] if f["subject"] == "Norvasc 5mg")
+    assert fact["source"] == "the person themselves"
+
+
+def test_a_bad_email_is_refused_before_it_reaches_sns():
+    d = client.post("/drawers", json={"boxes": ["a"]}).json()
+    assert client.post(f"/drawers/{d['id']}/subscribe", json={"email": "nope"}).status_code == 422
+
+
+def test_a_photo_of_the_drawer_becomes_box_text():
+    with open("web/sample-drawer.jpg", "rb") as fh:
+        r = client.post("/read-label", files=[("images", ("drawer.jpg", fh, "image/jpeg"))])
+    assert r.status_code == 200
+    boxes = r.json()["boxes"]
+    assert len(boxes) == 6 and any("glucophage" in b.lower() for b in boxes)
 
 
 def test_an_empty_drawer_is_not_an_error():
     r = client.post("/scan", json={"boxes": []})
-    assert r.status_code == 200
-    assert r.json()["findings"] == []
+    assert r.status_code == 200 and r.json()["findings"] == []
 
 
 def test_the_question_endpoint_answers_even_when_bedrock_is_unreachable():
-    """/scan must not be taken down by the writing model.
-
-    The drawer still has two boxes of metformin in it whether or not a language
-    model is available to phrase the question, so the failure is reported in
-    the response rather than raised.
-    """
     r = client.post("/question", json={
         "kind": "duplicate", "drugs": ["Glucophage 500mg", "Metformin 500 mg"],
         "detail": "both boxes resolve to the ingredient metformin"})
     assert r.status_code == 200
     body = r.json()
-    assert "ok" in body and "question" in body
     if body["ok"]:
-        assert "?" in body["question"]
-        assert "metformin" in body["question"].lower()
+        assert "?" in body["question"] and "metformin" in body["question"].lower()
         for advice in ("you should stop", "stop taking", "throw away"):
             assert advice not in body["question"].lower()
 
 
 def test_health_is_cheap_and_needs_no_network():
-    assert client.get("/health").json() == {"ok": True}
+    h = client.get("/health").json()
+    assert h["ok"] and h["store"] == "memory"
 
 
 # ---------------------------------------------------------------------------

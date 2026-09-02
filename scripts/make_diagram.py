@@ -99,39 +99,38 @@ fig.patch.set_facecolor(PAPER)
 ax.text(0.80, H - 0.45, "VitaCabinet", fontsize=31, fontweight="bold",
         color=INK, va="top")
 ax.text(0.80, H - 1.20,
-        "Three agents on the Strands Agents SDK. The one that writes to a person holds no tools.",
-        fontsize=13.5, color=MUTED, va="top")
+        "Three agents on the Strands Agents SDK read a drawer, keep watching it, and write the question. The one that writes holds no tools.",
+        fontsize=13.0, color=MUTED, va="top")
 ax.plot([0.80, W - 0.80], [H - 1.55, H - 1.55], color=LINE, lw=1.2)
 
 # ------------------------------------------------------------------ input
-band(ax, 11.20, 1.85, "what goes in")
-box(ax, 0, 11.30, 1.05, "Photos of the drawer",
-    ["one image per box, text read off the label"], PAPER, LINE, 13.5, 10.5)
-box(ax, 1, 11.30, 1.05, "A schedule",
-    ["the recall check nobody remembers to run"], PAPER, LINE, 13.5, 10.5)
-box(ax, 2, 11.30, 1.05, "Pharmacy · clinician · the person",
-    ["each list carries its own source and date"], PAPER, LINE, 13.5, 10.5)
+band(ax, 11.20, 1.85, "what goes in  ·  a photo, or typed text  ·  API Gateway → Lambda answers in milliseconds and hands the reading to a second invocation")
+box(ax, 0, 11.30, 1.05, "A photo of the drawer",
+    ["Nova Lite reads the printed labels — it reads, it does not identify"], PAPER, LINE, 13.5, 10.2)
+box(ax, 1, 11.30, 1.05, "A schedule — EventBridge, nightly",
+    ["re-reads every kept drawer; nobody has to open an app"], PAPER, LINE, 13.5, 10.2)
+box(ax, 2, 11.30, 1.05, "A kept drawer in DynamoDB",
+    ["boxes, facts with source and age, what was found last time"], PAPER, LINE, 13.5, 10.2)
 
 # ----------------------------------------------------------------- agents
-band(ax, 7.55, 3.35, "agents  ·  strands agents sdk  ·  amazon bedrock, eu-north-1")
+band(ax, 7.55, 3.35, "agents  ·  strands agents sdk  ·  amazon bedrock nova lite  ·  every tool call is written to the job as it happens, and the page draws it")
 box(ax, 0, 7.70, 2.50, "Identifier",
-    ["reads the drawer",
+    ["reads the drawer through its tools",
      "*may answer “I could not read this”",
      "a guess becomes a false alarm downstream"], AGENT, AGENT_ED)
 box(ax, 1, 7.70, 2.50, "Watchman",
     ["runs on the schedule, not on a request",
-     "*recalls arrive when they arrive",
-     "reports batches, never a medicine"], AGENT, AGENT_ED)
+     "*tells people only what is new",
+     "reports batches and lots, never a medicine"], AGENT, AGENT_ED)
 box(ax, 2, 7.70, 2.50, "Scribe",
     ["turns one finding into one question",
      "*holds no tools — see below",
      "never meets a user, so cannot be argued with"], SAFE, SAFE_ED)
-
 for x in CENT:
     arrow(ax, x, 11.28, 10.22)
 
 # ------------------------------------------------------------------ tools
-band(ax, 4.80, 2.45, "the tools each agent is given")
+band(ax, 4.80, 2.45, "the tools each agent is given  ·  a tool tells the model one sentence and writes the full result to a ledger the app reads")
 box(ax, 0, 4.90, 1.65, "identify_medicine\nfind_duplicate_medicines",
     ["identity and duplicates — clerical"], TOOL, TOOL_ED, 12.5, 10.5)
 box(ax, 1, 4.90, 1.65, "check_for_recalls",
@@ -139,7 +138,6 @@ box(ax, 1, 4.90, 1.65, "check_for_recalls",
 box(ax, 2, 4.90, 1.65, "SCRIBE_TOOLS = []",
     ["*the safety boundary is a capability,",
      "*not a paragraph in a prompt"], SAFE, SAFE_ED, 13.5, 11.0)
-
 for x in CENT[:2]:
     arrow(ax, x, 7.68, 6.57)
 arrow(ax, CENT[2], 7.68, 6.57, colour=SAFE_ED, dashed=True)
@@ -152,17 +150,15 @@ box(ax, 1, 2.35, 1.45, "openFDA enforcement  (FDA)",
     ["live recalls, and the affected lots"], DATA, DATA_ED, 13.0, 10.5)
 box(ax, 2, 2.35, 1.45, "nothing to look up",
     ["it is told what was found, and writes"], PAPER, SAFE_ED, 13.0, 10.5)
-
 for x in CENT[:2]:
     arrow(ax, x, 4.88, 3.82, style="<|-|>")
 
 # ---------------------------------------------------------------- cabinet
 box(ax, (0.90, 18.20), 0.30, 1.60,
-    "The Cabinet  —  every fact carries its source and its age",
+    "The Cabinet in DynamoDB  —  every fact carries its source and its age  ·  SNS says something only when something is new",
     ["pharmacy record 180 days   ·   clinician 120   ·   the person 90   ·   a box in the drawer 60   ·   inferred 30",
-     "*whatever decays below half becomes the queue the Scribe writes questions from"],
-    PAPER, INK, 14.0, 11.0)
-
+     "*what decays below half becomes the queue the Scribe writes questions from; confirming a fact resets it to the person"],
+    PAPER, INK, 13.5, 10.8)
 for x in CENT[:2]:
     arrow(ax, x, 2.33, 1.92)
 arrow(ax, CENT[2], 4.88, 1.92, colour=SAFE_ED, dashed=True)

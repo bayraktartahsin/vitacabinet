@@ -34,6 +34,9 @@ ROOT = Path(__file__).resolve().parent.parent
 REGION = "eu-north-1"
 FUNCTION = "vitacabinet"
 ROLE = "vitacabinet-lambda"
+TABLE = "vitacabinet"
+TOPIC = "vitacabinet-watchman"
+SCHEDULE = "vitacabinet-nightly"
 BUILD = ROOT / ".build"
 
 # Only what the app imports directly. boto3 is not listed because the Lambda
@@ -41,7 +44,8 @@ BUILD = ROOT / ".build"
 # regardless, which is most of the 28MB. Left alone deliberately: pruning a
 # transitive SDK to save upload seconds is how a deploy starts differing from
 # the thing that was tested.
-DEPS = ["fastapi", "mangum", "httpx", "pydantic", "strands-agents"]
+DEPS = ["fastapi", "mangum", "httpx", "pydantic", "strands-agents",
+        "email-validator", "python-multipart"]
 
 TRUST = {
     "Version": "2012-10-17",
@@ -52,20 +56,39 @@ TRUST = {
     }],
 }
 
-# The Scribe writes; the Watchman reads public data. Neither needs anything
-# beyond model invocation, so that is all the role is given.
-BEDROCK = {
-    "Version": "2012-10-17",
-    "Statement": [{
-        "Effect": "Allow",
-        "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-        "Resource": "*",
-    }],
-}
+# What the function is allowed to touch, and nothing else: the models, its own
+# table, its own topic, and itself (a scan is handed to a second, asynchronous
+# invocation because API Gateway will not wait more than 30 seconds).
+def policy(account: str) -> dict:
+    return {
+        "Version": "2012-10-17",
+        "Statement": [
+            {"Effect": "Allow", "Resource": "*",
+             "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]},
+            {"Effect": "Allow",
+             "Resource": f"arn:aws:dynamodb:{REGION}:{account}:table/{TABLE}",
+             "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
+                        "dynamodb:Scan", "dynamodb:Query"]},
+            {"Effect": "Allow",
+             "Resource": f"arn:aws:sns:{REGION}:{account}:{TOPIC}",
+             "Action": ["sns:Publish", "sns:Subscribe"]},
+            {"Effect": "Allow",
+             "Resource": f"arn:aws:lambda:{REGION}:{account}:function:{FUNCTION}",
+             "Action": ["lambda:InvokeFunction"]},
+        ],
+    }
 
 
 def say(msg: str) -> None:
     print(f"  {msg}", flush=True)
+
+
+def count_tests() -> int:
+    """The number the closing card shows. Counted, not typed, so it cannot
+    drift from the suite the way a hand-written '38' once did."""
+    out = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q"],
+                         capture_output=True, text=True, cwd=ROOT).stdout
+    return sum(1 for ln in out.splitlines() if "::" in ln)
 
 
 def build_zip() -> bytes:
@@ -117,18 +140,69 @@ def ensure_role(iam) -> str:
         say("waiting for the role to propagate…")
         time.sleep(12)
 
-    iam.put_role_policy(RoleName=ROLE, PolicyName="invoke-bedrock",
-                        PolicyDocument=json.dumps(BEDROCK))
     return arn
 
 
-def ensure_function(lam, role_arn: str, code: bytes) -> None:
+def ensure_table(ddb) -> None:
+    """One table, one key. Jobs expire; drawers do not."""
+    try:
+        ddb.describe_table(TableName=TABLE)
+        say(f"table exists: {TABLE}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        say(f"creating table {TABLE}…")
+        ddb.create_table(TableName=TABLE, BillingMode="PAY_PER_REQUEST",
+                         AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}],
+                         KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}])
+        ddb.get_waiter("table_exists").wait(TableName=TABLE)
+    try:
+        ddb.update_time_to_live(TableName=TABLE,
+                                TimeToLiveSpecification={"Enabled": True, "AttributeName": "expires"})
+    except ClientError as e:
+        if "already enabled" not in e.response["Error"]["Message"].lower():
+            say(f"ttl: {e.response['Error']['Code']}")
+
+
+def ensure_topic(sns) -> str:
+    """The Watchman's way of saying 'something new' — and only something new."""
+    arn = sns.create_topic(Name=TOPIC)["TopicArn"]
+    say(f"topic: {TOPIC}")
+    return arn
+
+
+def ensure_schedule(events, lam, account: str) -> None:
+    """Nightly. Recalls arrive when they arrive; nobody opens an app for them."""
+    rule = events.put_rule(Name=SCHEDULE, ScheduleExpression="rate(1 day)",
+                           State="ENABLED",
+                           Description="VitaCabinet: the Watchman re-reads every drawer")["RuleArn"]
+    fn_arn = f"arn:aws:lambda:{REGION}:{account}:function:{FUNCTION}"
+    events.put_targets(Rule=SCHEDULE, Targets=[{
+        "Id": "watchman", "Arn": fn_arn,
+        "Input": json.dumps({"source": "schedule", "job": "watchman"})}])
+    try:
+        lam.add_permission(FunctionName=FUNCTION, StatementId="eventbridge-nightly",
+                           Action="lambda:InvokeFunction", Principal="events.amazonaws.com",
+                           SourceArn=rule)
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceConflictException":
+            raise
+    say(f"schedule: {SCHEDULE} (rate(1 day))")
+
+
+def ensure_function(lam, role_arn: str, code: bytes, topic_arn: str) -> None:
     common = dict(
         Handler="app.lambda_handler.handler",
         Runtime="python3.12",
-        Timeout=90,          # /scan fans out to RxNav and openFDA per ingredient
-        MemorySize=1024,     # more memory is more CPU, and this is IO-bound anyway
-        Environment={"Variables": {"VITACABINET_MODEL": "eu.amazon.nova-lite-v1:0"}},
+        Timeout=300,         # a background reading runs two agents; the HTTP path
+        MemorySize=1024,     # answers in milliseconds and never waits on this
+        Environment={"Variables": {
+            "VITACABINET_MODEL": "eu.amazon.nova-lite-v1:0",
+            "VITACABINET_TABLE": TABLE,
+            "VITACABINET_TOPIC": topic_arn,
+            "VITACABINET_FUNCTION": FUNCTION,
+            "VITACABINET_TESTS": str(count_tests()),
+        }},
     )
     try:
         lam.get_function(FunctionName=FUNCTION)
@@ -199,17 +273,26 @@ def ensure_url(lam, account: str) -> str:
     return f"https://{api_id}.execute-api.{REGION}.amazonaws.com"
 
 
-def main() -> None:
+def main(infra_only: bool = False) -> None:
     print("\nVitaCabinet → AWS Lambda\n")
-    code = build_zip()
     account = boto3.client("sts").get_caller_identity()["Account"]
-    role_arn = ensure_role(boto3.client("iam"))
+    iam = boto3.client("iam")
+    role_arn = ensure_role(iam)
+    iam.put_role_policy(RoleName=ROLE, PolicyName="vitacabinet",
+                        PolicyDocument=json.dumps(policy(account)))
+    ensure_table(boto3.client("dynamodb", region_name=REGION))
+    topic_arn = ensure_topic(boto3.client("sns", region_name=REGION))
+    if infra_only:
+        print("\n  infrastructure ready\n")
+        return
+    code = build_zip()
     lam = boto3.client("lambda", region_name=REGION)
-    ensure_function(lam, role_arn, code)
+    ensure_function(lam, role_arn, code, topic_arn)
     url = ensure_url(lam, account)
+    ensure_schedule(boto3.client("events", region_name=REGION), lam, account)
     shutil.rmtree(BUILD, ignore_errors=True)
     print(f"\n  live at  {url}\n")
 
 
 if __name__ == "__main__":
-    main()
+    main(infra_only="--infra" in sys.argv)

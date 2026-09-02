@@ -4,6 +4,8 @@ boto3==1.43.83
 requests==2.34.2
 fastapi==0.141.1
 uvicorn==0.52.4
+email-validator==2.3.0      # EmailStr on the subscribe route
+python-multipart==0.0.32    # photo uploads
 
 # Tests. They run against the live NIH and FDA APIs on purpose — see tests/.
 pytest==9.1.1
