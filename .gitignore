@@ -24,3 +24,6 @@ keys.*
 *.pem
 credentials
 .aws/
+
+# macOS
+.DS_Store
